@@ -33,7 +33,8 @@ as Context-Type Semantic Matching](https://aclanthology.org/2023.findings-emnlp.
 > # Multi-modal NER
 > Adding another modality (**image**, audio, ...)
 > *Transfer learning* should kick in because natural language has shared properties across modalities.
-> # **TODO READ THIS**
+> # **Relevant work**
+>> Somewhat read / technical details skipped for now - will be used in the future.
 >> + [2M-NER: Contrastive Learning for Multilingual and
 Multimodal NER with Language and Modal Fusion](https://arxiv.org/pdf/2404.17122)
 >> + [LLMs as Bridges: Reformulating Grounded Multimodal Named Entity
@@ -41,10 +42,11 @@ Recognition](https://arxiv.org/pdf/2402.09989v4)
 >> + [Multimodal Named Entity Recognition for Short Social Media Posts
 ](https://aclanthology.org/N18-1078.pdf)
 > # Dataset
-
+>> Dataset from [portafontium](https://www.portafontium.eu/)
 
 
 > # Questions
 > *Adding image of the text as additional input -> will it increase the accururacy of classification?*
 >> Hypothesis 0: Adding another modality, such as an image of the text should increase the classification.
->> From the articles in the notes above, multi-modal NER **significantly outperforms** the classical NER models. 
+>> From the articles in the notes above, multi-modal NER **significantly outperforms** the classical NER models.
+>> TODO write down why it is possible - ie ref the articles above
