@@ -46,3 +46,5 @@ Recognition](https://arxiv.org/pdf/2402.09989v4)
 
 > # Questions
 > *Adding image of the text as additional input -> will it increase the accururacy of classification?*
+>> Hypothesis 0: Adding another modality, such as an image of the text should increase the classification.
+>> From the articles in the notes above, multi-modal NER **significantly outperforms** the classical NER models. 
