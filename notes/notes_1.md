@@ -41,6 +41,9 @@ Multimodal NER with Language and Modal Fusion](https://arxiv.org/pdf/2404.17122)
 Recognition](https://arxiv.org/pdf/2402.09989v4)
 >> + [Multimodal Named Entity Recognition for Short Social Media Posts
 ](https://aclanthology.org/N18-1078.pdf)
+>> + [Advancing Grounded Multimodal Named Entity
+Recognition via LLM-Based Reformulation and
+Box-Based Segmentation](https://arxiv.org/pdf/2406.07268)
 > # Dataset
 >> Dataset from [portafontium](https://www.portafontium.eu/)
 
