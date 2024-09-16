@@ -1,5 +1,16 @@
 from functools import partial
 
+def tokenize_and_align_labels(examples, tokenizer):
+    tokenized_inputs = tokenizer(examples["tokens"], truncation=True, is_split_into_words=True)
+
+    labels = []
+    for i, label in enumerate(examples[f"ner_tags"]):
+        word_ids = tokenized_inputs.word_ids(batch_index=i)  # Map tokens to words        
+        label_ids = [-100 if word_id is None else label[word_id] for word_id in word_ids]  # Align labels with tokens
+        labels.append(label_ids)
+
+    tokenized_inputs["labels"] = labels
+    return tokenized_inputs
 
 def create_prompt_formats(sample):
     """
@@ -38,6 +49,23 @@ def preprocess_batch(batch, tokenizer, max_length):
         truncation=True,
     )
 
+def preprocess_dataset_class(dataset, tokenizer):
+    return dataset.map(lambda item: tokenize_and_align_labels(item, tokenizer), batched=True)
+    
+    """
+    tokenized_dataset = []
+    for i in range(len(dataset)):
+        examples = dataset[i]
+        tokenized_inputs = tokenizer(examples["tokens"], truncation=True, is_split_into_words=True)
+        labels = []
+        for j, label in enumerate(examples[f"ner_tags"]):
+            word_ids = tokenized_inputs.word_ids(batch_index=j)  # Map tokens to words
+            label_ids = [-100 if word_id is None else label[word_id] for word_id in word_ids]  # Align labels with tokens
+            labels.append(label_ids)
+        tokenized_inputs["labels"] = labels
+        tokenized_dataset.append(tokenized_inputs)
+    return tokenized_dataset
+    """
 
 # SOURCE https://github.com/databrickslabs/dolly/blob/master/training/trainer.py
 def preprocess_dataset(tokenizer, max_length, seed, dataset):
@@ -63,5 +91,5 @@ def preprocess_dataset(tokenizer, max_length, seed, dataset):
     
     # Shuffle dataset
     dataset = dataset.shuffle(seed=seed)
-
+    
     return dataset

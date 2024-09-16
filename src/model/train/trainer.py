@@ -1,4 +1,4 @@
-from transformers import (Trainer, TrainingArguments, DataCollatorForLanguageModeling,AutoTokenizer)
+from transformers import (Trainer, TrainingArguments, DataCollatorForLanguageModeling,AutoTokenizer, DataCollatorForTokenClassification)
 from peft import AutoPeftModelForCausalLM,get_peft_model
 import os
 import torch
@@ -26,6 +26,33 @@ def print_trainable_parameters(model, use_4bit=False):
     print(
         f"all params: {all_param:,d} || trainable params: {trainable_params:,d} || trainable%: {100 * trainable_params / all_param}"
     )
+    
+    
+def train_class(model, tokenizer, dataset):
+
+    model = get_peft_model(model,create_lora_config(find_all_linear_names(model)))
+    training_args = TrainingArguments(
+    output_dir="./results",
+    evaluation_strategy="epoch",
+    learning_rate=2e-5,
+    per_device_train_batch_size=16,
+    per_device_eval_batch_size=16,
+    num_train_epochs=3,
+    weight_decay=0.01
+    )
+    data_collator = DataCollatorForTokenClassification(tokenizer)
+    
+    trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=dataset["train"],
+    eval_dataset=dataset["validation"],
+    tokenizer=tokenizer,
+    data_collator=data_collator)
+    
+    trainer.train()
+    
+        
     
     
 def train(model, tokenizer, dataset, output_dir):

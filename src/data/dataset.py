@@ -15,8 +15,9 @@ def load_news_dataset(path="news_text.csv"):
 
 # Load the databricks dataset from Hugging Face
 def load_hf_dataset():
-    dataset = load_dataset("databricks/databricks-dolly-15k", split="train")
+    dataset = load_dataset("conll2003",trust_remote_code=True)
     print(f'Number of prompts: {len(dataset)}')
     print(f'Column names are: {dataset.column_names}')
     return dataset
-    
+
+load_hf_dataset()

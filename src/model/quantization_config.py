@@ -38,6 +38,6 @@ def create_lora_config(modules):
                 target_modules=modules,
                 lora_dropout=0.05,  # dropout probability for layers
                 bias="none",
-                task_type="CAUSAL_LM",
+                task_type="TOKEN_CLS",
     )
     return config
