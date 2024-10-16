@@ -1,130 +1,60 @@
-from transformers import (Trainer, TrainingArguments, DataCollatorForLanguageModeling,AutoTokenizer, DataCollatorForTokenClassification)
-from peft import AutoPeftModelForCausalLM,get_peft_model
-import os
-import torch
-from model.quantization_config import create_lora_config,find_all_linear_names
+from transformers import (Trainer, TrainingArguments, DataCollatorForTokenClassification)
+from peft import get_peft_model
+import numpy as np
+import evaluate
+from model.quantization_config import create_lora_config
+
+seqeval = evaluate.load("seqeval")
+label2id = {'O': 0, 'B-PER': 1, 'I-PER': 2, 'B-ORG': 3, 'I-ORG': 4, 'B-LOC': 5, 'I-LOC': 6, 'B-MISC': 7, 'I-MISC': 8}
+id2label = {v: k for k, v in label2id.items()}
+label_list = list(label2id.keys())
 
 
+def compute_metrics(p):
+    predictions, labels = p
+    predictions = np.argmax(predictions, axis=2)
 
-def print_trainable_parameters(model, use_4bit=False):
-    """
-    Prints the number of trainable parameters in the model.
-    """
-    trainable_params = 0
-    all_param = 0
-    for _, param in model.named_parameters():
-        num_params = param.numel()
-        # if using DS Zero 3 and the weights are initialized empty
-        if num_params == 0 and hasattr(param, "ds_numel"):
-            num_params = param.ds_numel
+    true_predictions = [
+        [label_list[p] for (p, l) in zip(prediction, label) if l != -100]
+        for prediction, label in zip(predictions, labels)
+    ]
+    true_labels = [
+        [label_list[l] for (p, l) in zip(prediction, label) if l != -100]
+        for prediction, label in zip(predictions, labels)
+    ]
 
-        all_param += num_params
-        if param.requires_grad:
-            trainable_params += num_params
-    if use_4bit:
-        trainable_params /= 2
-    print(
-        f"all params: {all_param:,d} || trainable params: {trainable_params:,d} || trainable%: {100 * trainable_params / all_param}"
-    )
+    results = seqeval.compute(predictions=true_predictions, references=true_labels)
+    return {
+        "precision": results["overall_precision"],
+        "recall": results["overall_recall"],
+        "f1": results["overall_f1"],
+        "accuracy": results["overall_accuracy"],
+    }
+
     
-    
-def train_class(model, tokenizer, dataset):
-
-    model = get_peft_model(model,create_lora_config(find_all_linear_names(model)))
+def train_model(model, tokenizer, dataset):
+    model = get_peft_model(model,create_lora_config())
     training_args = TrainingArguments(
-    output_dir="./results",
-    evaluation_strategy="epoch",
-    learning_rate=2e-5,
-    per_device_train_batch_size=16,
-    per_device_eval_batch_size=16,
-    num_train_epochs=3,
-    weight_decay=0.01
+        output_dir="./results",
+        evaluation_strategy="epoch",
+        save_strategy="epoch",
+        per_device_train_batch_size=1,
+        per_device_eval_batch_size=1,
+        num_train_epochs=3,
+        weight_decay=0.01,
+        load_best_model_at_end=True,
     )
     data_collator = DataCollatorForTokenClassification(tokenizer)
     
     trainer = Trainer(
-    model=model,
-    args=training_args,
-    train_dataset=dataset["train"],
-    eval_dataset=dataset["validation"],
-    tokenizer=tokenizer,
-    data_collator=data_collator)
+        model=model,
+        args=training_args,
+        train_dataset=dataset["train"],
+        eval_dataset=dataset["validation"],
+        tokenizer=tokenizer,
+        data_collator=data_collator,
+        compute_metrics=compute_metrics
+    )
     
     trainer.train()
     
-        
-    
-    
-def train(model, tokenizer, dataset, output_dir):
-    
-    print_trainable_parameters(model)
-    model = get_peft_model(model,create_lora_config(find_all_linear_names(model)))
-    # Training parameters
-    trainer = Trainer(
-        model=model,
-        train_dataset=dataset,
-        args=TrainingArguments(
-            per_device_train_batch_size=1,
-            gradient_accumulation_steps=4,
-            warmup_steps=2,
-            #num_train_epochs=5
-            max_steps=20,
-            learning_rate=2e-4,
-            fp16=True,
-            logging_steps=1,
-            output_dir="outputs",
-            optim="paged_adamw_8bit",
-        ),
-        data_collator=DataCollatorForLanguageModeling(tokenizer, mlm=False)
-    )
-    
-    model.config.use_cache = False  # re-enable for inference to speed up predictions for similar inputs
-    
-    ### SOURCE https://github.com/artidoro/qlora/blob/main/qlora.py
-    # Verifying the datatypes before training
-    
-    dtypes = {}
-    for _, p in model.named_parameters():
-        dtype = p.dtype
-        if dtype not in dtypes: dtypes[dtype] = 0
-        dtypes[dtype] += p.numel()
-    total = 0
-    for k, v in dtypes.items(): total+= v
-    for k, v in dtypes.items():
-        print(k, v, v/total)
-     
-    do_train = True
-    
-    # Launch training
-    print("Training...")
-    
-    if do_train:
-        train_result = trainer.train()
-        metrics = train_result.metrics
-        trainer.log_metrics("train", metrics)
-        trainer.save_metrics("train", metrics)
-        trainer.save_state()
-        print(metrics)    
-    
-    
-    # Saving model
-    print("Saving last checkpoint of the model...")
-    os.makedirs(output_dir, exist_ok=True)
-    trainer.model.save_pretrained(output_dir)
-    
-    # Free memory for merging weights
-    del model
-    del trainer
-    torch.cuda.empty_cache()
-    
-    
-    model = AutoPeftModelForCausalLM.from_pretrained(output_dir, device_map="auto", torch_dtype=torch.bfloat16)
-    model = model.merge_and_unload()
-
-    output_merged_dir = "results/llama2/final_merged_checkpoint"
-    os.makedirs(output_merged_dir, exist_ok=True)
-    model.save_pretrained(output_merged_dir, safe_serialization=True)
-
-    # save tokenizer for easy inference
-    tokenizer = AutoTokenizer.from_pretrained(output_dir)
-    tokenizer.save_pretrained(output_merged_dir)

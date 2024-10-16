@@ -1,6 +1,6 @@
 from transformers import BitsAndBytesConfig
 from torch import bfloat16
-from peft import LoraConfig
+from peft import LoraConfig, TaskType
 import bitsandbytes as bnb
 
 
@@ -27,17 +27,16 @@ def find_all_linear_names(model):
     return list(lora_module_names)
 
 
-def create_lora_config(modules):
+def create_lora_config():
     """
     Create Parameter-Efficient Fine-Tuning config for your model
     :param modules: Names of the modules to apply Lora to
     """
     config = LoraConfig(
-                r=8,  # dimension of the updated matrices
+                r=2,  # dimension of the updated matrices
                 lora_alpha=32,  # parameter for scaling
-                target_modules=modules,
-                lora_dropout=0.05,  # dropout probability for layers
+                lora_dropout=0.1,  # dropout probability for layers
                 bias="none",
-                task_type="TOKEN_CLS",
+                task_type=TaskType.TOKEN_CLS,
     )
     return config
