@@ -1,3 +1,6 @@
 llama
 target
 venv
+finetuned
+*/__pycache__
+.idea
