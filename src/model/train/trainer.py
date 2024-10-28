@@ -1,8 +1,9 @@
-from transformers import (Trainer, TrainingArguments, DataCollatorForTokenClassification)
-from peft import get_peft_model
-import numpy as np
 import evaluate
-from model.quantization_config import create_lora_config
+import numpy as np
+from peft import get_peft_model
+from transformers import (Trainer, TrainingArguments, DataCollatorForTokenClassification)
+
+from src.model.quantization import create_lora_config
 
 seqeval = evaluate.load("seqeval")
 label2id = {'O': 0, 'B-PER': 1, 'I-PER': 2, 'B-ORG': 3, 'I-ORG': 4, 'B-LOC': 5, 'I-LOC': 6, 'B-MISC': 7, 'I-MISC': 8}
@@ -31,9 +32,9 @@ def compute_metrics(p):
         "accuracy": results["overall_accuracy"],
     }
 
-    
-def train_model(model, tokenizer, dataset):
-    model = get_peft_model(model,create_lora_config())
+
+def train_transformer_model(model, tokenizer, dataset):
+    model = get_peft_model(model, create_lora_config())
     training_args = TrainingArguments(
         output_dir="./results",
         evaluation_strategy="epoch",
@@ -45,7 +46,7 @@ def train_model(model, tokenizer, dataset):
         load_best_model_at_end=True,
     )
     data_collator = DataCollatorForTokenClassification(tokenizer)
-    
+
     trainer = Trainer(
         model=model,
         args=training_args,
@@ -55,6 +56,9 @@ def train_model(model, tokenizer, dataset):
         data_collator=data_collator,
         compute_metrics=compute_metrics
     )
-    
-    trainer.train()
-    
+
+    return trainer.train()
+
+
+def train_torch_model(model):
+    pass
