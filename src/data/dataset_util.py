@@ -1,4 +1,3 @@
-
 def tokenize_and_align_labels(examples, tokenizer):
     tokenized_inputs = tokenizer(examples["tokens"], truncation=True, is_split_into_words=True, max_length=1024, padding="longest")
     labels = []
@@ -11,3 +10,17 @@ def tokenize_and_align_labels(examples, tokenizer):
 
 def preprocess_dataset_class(dataset, tokenizer):
     return dataset.map(lambda item: tokenize_and_align_labels(item, tokenizer), batched=True)
+
+
+
+def preprocess_twitter_dataset(dataset):
+    pass
+
+
+
+
+
+
+
+
+
