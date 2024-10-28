@@ -1,6 +1,6 @@
-from src.security import token_manager
 from torch import float16
 from transformers import LlamaForTokenClassification, LlamaTokenizerFast, AutoModelForTokenClassification, AutoTokenizer
+from custom_models.convolutional_net import ConvNet
 
 label2id = {'O': 0, 'B-PER': 1, 'I-PER': 2, 'B-ORG': 3, 'I-ORG': 4, 'B-LOC': 5, 'I-LOC': 6, 'B-MISC': 7, 'I-MISC': 8}
 id2label = {v: k for k, v in label2id.items()}
@@ -17,9 +17,13 @@ def create_llama_classifier(model_name, bnb):
         id2label=id2label,
         label2id=label2id
     )
-    llamaTokenizer = LlamaTokenizerFast.from_pretrained(model_name, token=token_manager.get_access_token())
+    llamaTokenizer = LlamaTokenizerFast.from_pretrained(model_name)
     llamaTokenizer.pad_token = llamaTokenizer.eos_token
     return model, llamaTokenizer
+
+
+def create_convolutional_net():
+    return ConvNet()
 
 
 def create_model(model_name, bnb):
@@ -28,7 +32,7 @@ def create_model(model_name, bnb):
         device_map="auto",
         low_cpu_mem_usage=True,
         torch_dtype=float16,
-        #quantization_config=bnb,
+        # quantization_config=bnb,
         num_labels=len(label2id.items()),
         id2label=id2label,
         label2id=label2id
