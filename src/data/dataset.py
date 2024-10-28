@@ -49,9 +49,10 @@ async def __process_image(image_processor: Callable[[bytes, str], Future[bytes]]
 
 async def __load_twitter_text_dataset(image_processor: Callable[[str], str]):
     pass
-
+'''
 print("Loading dataset")
 start = time.time()
 asyncio.run(load_twitter_dataset(process_sentence, process_image), debug=True)
 end = time.time()
-print(f"Loading took: {end - start}")
+print(f"Loading took: {(end - start) * 1000} ms")
+'''
