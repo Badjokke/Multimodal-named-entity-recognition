@@ -1,6 +1,6 @@
 from torch import float16
 from transformers import LlamaForTokenClassification, LlamaTokenizerFast, AutoModelForTokenClassification, AutoTokenizer
-from custom_models.convolutional_net import ConvNet
+from src.model.custom_models.convolutional_net import ConvNet
 
 label2id = {'O': 0, 'B-PER': 1, 'I-PER': 2, 'B-ORG': 3, 'I-ORG': 4, 'B-LOC': 5, 'I-LOC': 6, 'B-MISC': 7, 'I-MISC': 8}
 id2label = {v: k for k, v in label2id.items()}

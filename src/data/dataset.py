@@ -4,7 +4,7 @@ from typing import Callable, Coroutine
 import time
 from datasets import load_dataset
 from src.async_io import filesystem
-from data_processors import process_image, process_sentence
+from src.data.data_processors import process_image, process_sentence
 
 path = "../../dataset/twitter_2017"
 
@@ -49,10 +49,10 @@ async def __process_image(image_processor: Callable[[bytes, str], Future[bytes]]
 
 async def __load_twitter_text_dataset(image_processor: Callable[[str], str]):
     pass
-'''
-print("Loading dataset")
-start = time.time()
-asyncio.run(load_twitter_dataset(process_sentence, process_image), debug=True)
-end = time.time()
-print(f"Loading took: {(end - start) * 1000} ms")
-'''
+
+if __name__ == "__main__":
+    print("Loading dataset")
+    start = time.time()
+    asyncio.run(load_twitter_dataset(process_sentence, process_image), debug=True)
+    end = time.time()
+    print(f"Loading took: {(end - start) * 1000} ms")
