@@ -6,3 +6,4 @@ finetuned
 */__pycache__
 .idea
 *.pyc
+token
