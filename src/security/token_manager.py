@@ -1,5 +1,4 @@
-hf_token = "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"
-
+token_path = "../token"
 def get_access_token():
-    return hf_token
-
+    with open(token_path,"r",encoding="utf-8") as f:
+        return f.read()
