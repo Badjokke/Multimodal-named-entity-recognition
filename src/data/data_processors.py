@@ -1,16 +1,18 @@
 from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
+
+import json
 import cv2 as opencv
 import numpy as np
-io_pool_exec = ThreadPoolExecutor(max_workers=4)
+io_pool_exec = ThreadPoolExecutor(max_workers=10)
 
 
-def process_sentence(sentence: str) -> Future[str]:
+def process_twitter2017_text(sentence: str) -> Future[str]:
     return io_pool_exec.submit(__process_text, sentence)
 
 
 
-def process_image(image_binary: bytes, extension: str) -> Future[bytes]:
+def process_twitter2017_image(image_binary: bytes, extension: str) -> Future[bytes]:
     return io_pool_exec.submit(__process_image, image_binary, extension)
 
 
