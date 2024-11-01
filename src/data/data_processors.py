@@ -27,5 +27,5 @@ def __process_image(image_binary: bytes, extension: str) -> bytes:
     return buffer.tobytes()
 
 def __process_text(text: str) -> str:
-    print(text)
+    #print(text)
     return text
