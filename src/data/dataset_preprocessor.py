@@ -1,34 +1,33 @@
 import asyncio
-import time
 from concurrent.futures import Future
 from typing import Callable, Coroutine
 
-from src.async_io import filesystem
-from src.data.data_processors import process_twitter2017_image, process_twitter2017_text
+from async_io import filesystem
+from data.data_processors import process_twitter2017_image, process_twitter2017_text
 
-input_path = "../../dataset/twitter_2017"
-output_path = "../../dataset/preprocessed/twitter_2017"
+input_path = "../dataset/twitter_2017"
+output_path = "../dataset/preprocessed/twitter_2017"
 
 
-async def load_twitter_dataset(text_processor: Callable[[str], Future[str]],
+async def load_twitter_dataset(text_processor: Callable[[str], Future[tuple[list[str], list[str], list[str]]]],
                                image_processor: Callable[[bytes, str], Future[bytes]]):
-    text_task = asyncio.create_task(__load_twitter_text_dataset(text_processor, filesystem.save_file))
-    image_task = asyncio.create_task(__load_twitter_image_dataset(image_processor, filesystem.save_file))
+    text_task = asyncio.create_task(_load_twitter_text_dataset(text_processor, filesystem.save_file))
+    image_task = asyncio.create_task(_load_twitter_image_dataset(image_processor, filesystem.save_file))
     return await asyncio.gather(text_task, image_task)
 
 
-async def __load_twitter_image_dataset(image_processor: Callable[[bytes, str], Future[bytes]],
-                                       file_writer: Callable[[str, bytes], Coroutine]):
+async def _load_twitter_image_dataset(image_processor: Callable[[bytes, str], Future[bytes]],
+                                      file_writer: Callable[[str, bytes], Coroutine]):
     in_path = f"{input_path}/images"
     unfinished_queue = asyncio.Queue(maxsize=500)
 
     await asyncio.gather(filesystem.load_directory_contents(in_path, unfinished_queue),
-                         __process_image(image_processor, unfinished_queue, file_writer))
+                         _process_image(image_processor, unfinished_queue, file_writer))
 
 
-async def __process_image(image_processor: Callable[[bytes, str], Future[bytes]],
-                          queue: asyncio.Queue[tuple[str, bytes]],
-                          file_writer: Callable[[str, bytes], Coroutine]):
+async def _process_image(image_processor: Callable[[bytes, str], Future[bytes]],
+                         queue: asyncio.Queue[tuple[str, bytes]],
+                         file_writer: Callable[[str, bytes], Coroutine]):
     out_path = f"{output_path}/image_preprocessed"
     while True:
         item = await queue.get()
@@ -43,17 +42,17 @@ async def __process_image(image_processor: Callable[[bytes, str], Future[bytes]]
         # future_result.add_done_callback(lambda future: file_writer(f"{out_path}/{file_name}",future.result()))
 
 
-async def __load_twitter_text_dataset(text_processor: Callable[[str], Future[str]],
-                                      file_writer: Callable[[str, bytes], Coroutine]):
+async def _load_twitter_text_dataset(text_processor: Callable[[str], Future[tuple[list[str], list[str], list[str]]]],
+                                     file_writer: Callable[[str, bytes], Coroutine]):
     in_path = f"{input_path}/text"
     unfinished_queue = asyncio.Queue(maxsize=500)
     await asyncio.gather(filesystem.load_directory_contents_generator(in_path, unfinished_queue),
-                         __process_text(text_processor, unfinished_queue, file_writer))
+                         _process_text(text_processor, unfinished_queue, file_writer))
 
 
-async def __process_text(text_processor: Callable[[str], Future[str]], queue: asyncio.Queue[tuple[str, str]],
-                         file_writer: Callable[[str, bytes], Coroutine]):
-    out_path = f"{output_path}/text_processed"
+async def _process_text(text_processor: Callable[[str], Future[tuple[list[str], list[str], list[str]]]], queue: asyncio.Queue[tuple[str, str]],
+                        file_writer: Callable[[str, bytes], Coroutine]):
+    out_path = f"{output_path}/text_preprocessed"
     # TODO file appender
     #
     file_buffer = ""
@@ -70,12 +69,4 @@ async def __process_text(text_processor: Callable[[str], Future[str]], queue: as
             continue
         future_result = text_processor(bin_data)
         result = future_result.result(2000)
-        file_buffer += result
-
-
-if __name__ == "__main__":
-    print("Loading dataset, image and text")
-    start = time.time()
-    asyncio.run(load_twitter_dataset(process_twitter2017_text, process_twitter2017_image), debug=True)
-    end = time.time()
-    print(f"Loading took: {(end - start) * 1000} ms")
+        file_buffer += f"{{text:{result[0]},image:{result[1]},label:{result[2]}}}\n"
