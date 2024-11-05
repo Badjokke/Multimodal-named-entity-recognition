@@ -17,6 +17,16 @@ async def file_lines_generator(path: str):
     yield "EOF"
     return
 
+async def save_file_consumer(queue: asyncio.Queue[tuple[str, bytes]]):
+    while True:
+        item = await queue.get()
+        if item is None:
+            queue.task_done()
+            return
+        path = item[0]
+        content = item[1]
+        await save_file(path, content)
+        queue.task_done()
 
 async def save_file(path: str, content: bytes):
     async with aiofiles.open(path, 'wb') as f:

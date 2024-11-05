@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 import cv2 as opencv
 import numpy as np
 from nltk.stem import PorterStemmer
+from torch import from_numpy
 
 io_pool_exec = ThreadPoolExecutor(max_workers=10)
 ps = PorterStemmer()
@@ -42,3 +43,27 @@ def _stem_text(text: list[str]) -> list[str]:
     for i in range(len(text)):
         stemmed_text.append(ps.stem(text[i]))
     return stemmed_text
+
+
+# TODO fix preprocessed json
+def _parse_twitter_text(content: bytes):
+    lines = content.decode('utf-8').split('\n')
+    list = []
+    for line in lines:
+        jsonl = json.loads(line)
+        list.append((jsonl["text"], jsonl["images"], jsonl["label"]))
+    return list
+
+def parse_twitter_text(content:bytes):
+    return io_pool_exec.submit(_parse_twitter_text, content)
+
+
+def image_to_tensor(image: bytes):
+    return io_pool_exec.submit(_image_to_tensor, image)
+
+# TODO returns nil tensor
+def _image_to_tensor(image: bytes):
+    img_decoded = opencv.imdecode(np.frombuffer(image, dtype=np.uint8), opencv.IMREAD_COLOR)
+    img_decoded = opencv.cvtColor(img_decoded, opencv.COLOR_BGR2RGB)
+    tensor = from_numpy(img_decoded).permute(2, 0, 1)
+    return tensor
