@@ -20,5 +20,5 @@ class CombinedModel(torch.nn.Module):
         text_out = self.__text_model(**text_feats).last_hidden_state[:, 0, :]
         combined = torch.cat((visual_out,text_out), dim=1)
         x = F.relu(self.__connector(combined))
-        output = self.__out_layer(self.__dropout(x))
+        output = F.relu(self.__out_layer(self.__dropout(x)))
         return output

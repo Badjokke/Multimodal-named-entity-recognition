@@ -33,7 +33,7 @@ def create_model(model_name, bnb):
         device_map="auto",
         low_cpu_mem_usage=True,
         torch_dtype=float16,
-        quantization_config=bnb,
+        #quantization_config=bnb,
         #num_labels=len(label2id.items()),
         #id2label=id2label,
         #label2id=label2id

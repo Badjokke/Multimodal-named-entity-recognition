@@ -1,3 +1,4 @@
+"""
 import evaluate
 import numpy as np
 from peft import get_peft_model
@@ -62,3 +63,9 @@ def train_transformer_model(model, tokenizer, dataset):
 
 def train_torch_model(model):
     pass
+"""
+import torch
+
+def train_model(model: torch.nn.Module, x):
+    pass
+
