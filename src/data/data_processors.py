@@ -30,12 +30,12 @@ def _process_image(image_binary: bytes, extension: str) -> bytes:
     return buffer.tobytes()
 
 
-def _process_json_text(text: str) -> tuple[list[str], list[str], list[str]]:
+def _process_json_text(text: str) -> tuple[str, str, str]:
     json_value = json.loads(text)
     text = json_value.get('text')
     labels = json_value.get('label')
     related_images = json_value.get('images')
-    return _stem_text(text), related_images, labels
+    return json.dumps(text), json.dumps(related_images), json.dumps(labels)
 
 
 def _stem_text(text: list[str]) -> list[str]:
@@ -45,25 +45,28 @@ def _stem_text(text: list[str]) -> list[str]:
     return stemmed_text
 
 
-# TODO fix preprocessed json
-def _parse_twitter_text(content: bytes):
+def _parse_twitter_text(content: bytes) -> list[dict[str, str]]:
     lines = content.decode('utf-8').split('\n')
-    list = []
+    tmp = []
     for line in lines:
+        if line == '\n':
+            continue
         jsonl = json.loads(line)
-        list.append((jsonl["text"], jsonl["images"], jsonl["label"]))
-    return list
+        tmp.append(jsonl)
+    return tmp
 
-def parse_twitter_text(content:bytes):
+
+def parse_twitter_text(content: bytes) -> Future[list[dict[str, str]]]:
     return io_pool_exec.submit(_parse_twitter_text, content)
 
 
 def image_to_tensor(image: bytes):
     return io_pool_exec.submit(_image_to_tensor, image)
 
-# TODO returns nil tensor
+
 def _image_to_tensor(image: bytes):
     img_decoded = opencv.imdecode(np.frombuffer(image, dtype=np.uint8), opencv.IMREAD_COLOR)
     img_decoded = opencv.cvtColor(img_decoded, opencv.COLOR_BGR2RGB)
     tensor = from_numpy(img_decoded).permute(2, 0, 1)
     return tensor
+

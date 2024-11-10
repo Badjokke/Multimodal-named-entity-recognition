@@ -4,7 +4,6 @@ from typing import Callable, Coroutine
 
 from async_io import filesystem
 from data.data_processors import process_twitter2017_image, process_twitter2017_text
-
 input_path = "../dataset/twitter_2017"
 output_path = "../dataset/preprocessed/twitter_2017"
 
