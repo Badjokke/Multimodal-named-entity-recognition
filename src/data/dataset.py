@@ -3,11 +3,9 @@ from concurrent.futures import Future
 from typing import Callable
 
 import torch
+from data.data_processors import image_to_tensor, parse_twitter_text
 from datasets import load_dataset
-
-import src.async_io.filesystem as filesystem
-from src.data.data_processors import image_to_tensor, parse_twitter_text
-
+from async_io import filesystem
 input_path = "../dataset/preprocessed/twitter_2017"
 
 

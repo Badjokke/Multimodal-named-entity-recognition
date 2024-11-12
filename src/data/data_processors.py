@@ -1,6 +1,5 @@
 import json
-from concurrent.futures import Future
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 
 import cv2 as opencv
 import numpy as np
@@ -69,4 +68,3 @@ def _image_to_tensor(image: bytes):
     img_decoded = opencv.cvtColor(img_decoded, opencv.COLOR_BGR2RGB)
     tensor = from_numpy(img_decoded).permute(2, 0, 1)
     return tensor
-
