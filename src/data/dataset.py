@@ -3,9 +3,11 @@ from concurrent.futures import Future
 from typing import Callable
 
 import torch
-from data.data_processors import image_to_tensor, parse_twitter_text
 from datasets import load_dataset
+
 from async_io import filesystem
+from data.data_processors import image_to_tensor, parse_twitter_text
+
 input_path = "../dataset/preprocessed/twitter_2017"
 
 
@@ -80,16 +82,16 @@ def _prepare_twitter_dataset_for_training(text_set: dict[str, dict[str]], image_
         for json in jsonl_file:
             image_refs = json['image']
             sentence_labels = json['label']
-            image_tensors = []
+            sentence_labels_id = []
             for label in sentence_labels:
                 if label not in labels:
                     labels[label] = label_id
                     label_id += 1
+                sentence_labels_id.append(labels[label])
             for image in image_refs:
-                image_tensor = image_set[image]
-                if image_tensor is None:
+                if image not in image_set:
                     print(f"Tensor for image ref: {image} missing!")
                     continue
-                image_tensors.append(image_tensor / 255)
-            final_dataset[key].append((json['text'], torch.stack(image_tensors, dim=0), sentence_labels))
+                image_tensor = image_set[image]
+                final_dataset[key].append((json['text'], image_tensor, torch.tensor(sentence_labels_id)))
     return final_dataset, labels

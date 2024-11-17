@@ -15,6 +15,6 @@ class ConvNet(nn.Module):
     def forward(self, x):
         x = self.max_pool1(F.relu(self.conv1(x)))
         x = self.max_pool1(F.relu(self.conv2(x)))
-        x = flatten(x, 1)
+        x = flatten(x, 0)
         x = F.relu(self.fc1(x))
         return x

@@ -67,4 +67,4 @@ def _image_to_tensor(image: bytes):
     img_decoded = opencv.imdecode(np.frombuffer(image, dtype=np.uint8), opencv.IMREAD_COLOR)
     img_decoded = opencv.cvtColor(img_decoded, opencv.COLOR_BGR2RGB)
     tensor = from_numpy(img_decoded).permute(2, 0, 1)
-    return tensor
+    return tensor / 255

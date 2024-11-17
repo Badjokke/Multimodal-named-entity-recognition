@@ -18,8 +18,8 @@ def create_llama_classifier(model_name, bnb):
         #id2label=id2label,
         #label2id=label2id
     )
-    llamaTokenizer = LlamaTokenizerFast.from_pretrained(model_name)
-    llamaTokenizer.pad_token = llamaTokenizer.eos_token
+    llamaTokenizer = LlamaTokenizerFast.from_pretrained(model_name )
+    #llamaTokenizer.pad_token = llamaTokenizer.eos_token
     return model, llamaTokenizer
 
 
@@ -38,7 +38,7 @@ def create_model(model_name, bnb):
         #id2label=id2label,
         #label2id=label2id
     )
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_name, add_bos_token=True)
     tokenizer.pad_token = tokenizer.eos_token
     return model, tokenizer
 

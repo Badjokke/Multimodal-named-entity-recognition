@@ -17,14 +17,17 @@ def training_loop(model: torch.nn.Module, train_data, tokenizer, epochs=5):
     for epoch in range(epochs):
         running_loss = 0.0
         for i in range(len(train_data)):
-            optimizer.zero_grad()
 
             data_sample = train_data[i]
-            text = tokenizer("".join(data_sample[0]), return_tensors="pt")
             images = data_sample[1]
             labels = data_sample[2]
+
+            text = tokenizer("".join(data_sample[0]), return_tensors="pt", max_length=len(labels))
             outputs = model(images, text)
-            loss = loss_criterion(outputs, labels)
+            # padded_labels = torch.full(len(text["input_ids"], ) -100, dtype=torch.long)
+            # padded_labels[1:1 + len(labels)] = labels
+            loss = loss_criterion(outputs.view(-1, 9), labels)
+            optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
@@ -32,6 +35,7 @@ def training_loop(model: torch.nn.Module, train_data, tokenizer, epochs=5):
                 print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 500:.3f}')
                 running_loss = 0.0
     return model
+
 
 def perform_inference(model: torch.nn.Module, test_data):
     pass
