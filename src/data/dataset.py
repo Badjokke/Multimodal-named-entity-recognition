@@ -3,7 +3,6 @@ from concurrent.futures import Future
 from typing import Callable
 
 import torch
-from datasets import load_dataset
 
 from async_io import filesystem
 from data.data_processors import image_to_tensor, parse_twitter_text
@@ -12,9 +11,6 @@ input_path = "../dataset/preprocessed/twitter_2017"
 
 
 # Load the databricks dataset from Hugging Face
-def load_hf_dataset():
-    dataset = load_dataset("conll2003", trust_remote_code=True)
-    return dataset
 
 
 async def load_twitter_dataset() -> tuple:

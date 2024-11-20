@@ -22,9 +22,8 @@ class CombinedModel(torch.nn.Module):
         return output
 
     def predict(self, visual_feats, text_feats):
-        # Perform a forward pass and apply softmax for label prediction
         logits = self.forward(visual_feats, text_feats)
         probabilities = F.softmax(logits, dim=-1)
-        predicted_labels = torch.argmax(probabilities, dim=-1)
+        predicted_labels = torch.argmax(probabilities, dim=2)
 
         return predicted_labels

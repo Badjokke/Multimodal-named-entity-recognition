@@ -39,7 +39,3 @@ def training_loop(model: torch.nn.Module, train_data, tokenizer, epochs=5):
                 print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 500:.3f}')
                 running_loss = 0.0
     return model
-
-
-def perform_inference(model: torch.nn.Module, test_data):
-    pass
