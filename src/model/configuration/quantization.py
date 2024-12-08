@@ -1,4 +1,4 @@
-from peft import LoraConfig, TaskType
+from peft import LoraConfig, TaskType, get_peft_model, PeftModel
 from torch import bfloat16
 from transformers import BitsAndBytesConfig
 
@@ -13,16 +13,18 @@ def create_default_quantization_config() -> BitsAndBytesConfig:
     return quantization_config
 
 
-def create_lora_config() -> LoraConfig:
+def _create_lora_config() -> LoraConfig:
     """
     Create Parameter-Efficient Fine-Tuning config for your model
-    :param modules: Names of the modules to apply Lora to
     """
     config = LoraConfig(
-        r=2,  # dimension of the updated matrices
-        lora_alpha=32,  # parameter for scaling
-        lora_dropout=0.1,  # dropout probability for layers
-        bias="none",
-        task_type=TaskType.TOKEN_CLS,
+        r=16,
+        lora_alpha=32,
+        lora_dropout=0.1,
+        target_modules=['q_proj', 'k_proj', 'v_proj'], # this allows us to adjust weights for matrices used in attention computation
     )
     return config
+
+
+def create_parameter_efficient_model(model) -> PeftModel:
+    return get_peft_model(model, _create_lora_config())

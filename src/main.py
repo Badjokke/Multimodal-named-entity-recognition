@@ -7,16 +7,13 @@ from huggingface_hub import login
 import data.dataset_preprocessor as data_preprocessor
 from data.data_processors import process_twitter2017_text, process_twitter2017_image
 from data.dataset import load_twitter_dataset
-from model.configuration.quantization import create_default_quantization_config
-from model.model_factory import (create_model)
+from model.configuration.quantization import create_default_quantization_config, create_parameter_efficient_model
+from model.model_factory import (create_model, create_model_for_lm)
 from model.multimodal.text_image_model import CombinedModel
-from model.util import load_and_filter_state_dict
+from model.util import load_and_filter_state_dict, create_message
 from model.visual.convolutional_net import ConvNet
 from security.token_manager import TokenManager
 from train import train
-
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
 
 async def inference(model_path):
     model_name = "meta-llama/Llama-3.1-8B"
@@ -34,7 +31,7 @@ async def inference(model_path):
 
     state_dict = load_and_filter_state_dict(model_path)
     combined.load_state_dict(state_dict)
-    train.inference_loop(combined, data['test'], tokenizer)
+    train.inference_loop_combined_model(combined, data['test'], tokenizer)
 
 
 async def preprocess_twitter():
@@ -66,9 +63,9 @@ async def main():
     # cnn(torch.rand(3, 256, 256))
     print("Creating model")
     model, tokenizer = create_model(model_name, create_default_quantization_config())
-    combined = CombinedModel(cnn, model, len(labels.keys()))
+    combined = create_parameter_efficient_model(CombinedModel(cnn, model, len(labels.keys())))
     print("Training combined model")
-    combined = train.training_loop(combined, data['train'], tokenizer)
+    combined = train.training_loop_combined(combined, data['train'], tokenizer, list(labels.values()))
     print("Saving model")
     MODEL_OUT_PATH = "./combined_model.pth"
     torch.save(combined.state_dict(), MODEL_OUT_PATH)
@@ -76,5 +73,20 @@ async def main():
     # text_input = tokenizer(" ".join(text[1][0][0][0]), return_tensors="pt")
 
 
+async def ner_prompt():
+    token_manager = TokenManager()
+    login(token_manager.get_access_token())
+    model_name = "meta-llama/Llama-3.1-8B-Instruct"
+
+    model, tokenizer = create_model_for_lm(model_name, create_default_quantization_config())
+    data, labels = await load_twitter_dataset()
+    system_text = f"Perform named entity recognition using only these entities: {labels}. Answer in format 'token':'label' on new line for each token."
+    msg = create_message(system_text, " ".join(data['test'][10][0]))
+
+    tokenizer_out = tokenizer(msg, return_tensors="pt")
+    outputs = model.generate(input_ids=tokenizer_out["input_ids"], max_new_tokens=100, attention_mask=tokenizer_out["attention_mask"])
+    answer = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    print(answer)
+
 if __name__ == "__main__":
-    asyncio.run(preprocess_twitter())
+    asyncio.run(main())
