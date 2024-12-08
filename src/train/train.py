@@ -7,7 +7,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def _create_cross_entropy_loss_criterion(labels) -> torch.nn.CrossEntropyLoss:
     #y = np.array(labels)
-    weight = [0.3, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]#compute_class_weight('balanced', np.unique(y),y)
+    weight = [0.3, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]#compute_class_weight('balanced', np.unique(y),y)
     return torch.nn.CrossEntropyLoss(weight=torch.tensor(weight, device=device), ignore_index=-100, reduction='mean')
 
 
@@ -52,6 +52,7 @@ def training_loop_combined(model: torch.nn.Module, train_data, validation_data, 
         if loss > previous_loss:
             no_improvement_counter += 1
             previous_loss = loss
+        else: no_improvement_counter = 0
 
         mean_loss += loss
     print(f"Average loss: {mean_loss}")
@@ -77,7 +78,7 @@ def perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, sched
         optimizer.zero_grad()
 
         outputs = model(images, text)
-        loss = loss_criterion(outputs.unsqueeze(0), aligned_labels)
+        loss = loss_criterion(outputs.squeeze(0), aligned_labels)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         running_loss += loss.item()

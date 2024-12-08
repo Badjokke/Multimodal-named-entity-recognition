@@ -9,7 +9,7 @@ class CombinedModel(torch.nn.Module):
         self.__text_model = text_model
         self.__connector = torch.nn.Linear(1080 + text_model.config.hidden_size, 2911)
         self.__dropout = torch.nn.Dropout(0.5)
-        self.__out_layer = torch.nn.Linear(2911, num_labels)
+        self.__out_layer = torch.nn.Linear(1024, num_labels)
         self.__fusion_layer = torch.nn.Sequential(
             torch.nn.Linear(1080 + text_model.config.hidden_size, 1024),
             torch.nn.ReLU(),

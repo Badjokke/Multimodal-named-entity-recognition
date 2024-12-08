@@ -1,5 +1,6 @@
 from torch import float16
-from transformers import LlamaForTokenClassification, LlamaTokenizerFast, AutoTokenizer, LlamaModel, LlamaForCausalLM
+from transformers import LlamaForTokenClassification, LlamaTokenizerFast, AutoTokenizer, LlamaModel, LlamaForCausalLM, \
+    RobertaTokenizerFast, RobertaModel
 
 from model.visual.convolutional_net import ConvNet
 
@@ -8,25 +9,13 @@ from model.visual.convolutional_net import ConvNet
 # id2label = {v: k for k, v in label2id.items()}
 
 
-def create_llama_classifier(model_name, bnb):
-    model = LlamaForTokenClassification.from_pretrained(
-        model_name,
-        device_map="auto",
-        low_cpu_mem_usage=True,
-        torch_dtype=float16,
-        quantization_config=bnb,
-        # num_labels=len(label2id.items()),
-        # id2label=id2label,
-        # label2id=label2id
-    )
-    llamaTokenizer = LlamaTokenizerFast.from_pretrained(model_name)
-    # llamaTokenizer.pad_token = llamaTokenizer.eos_token
-    return model, llamaTokenizer
-
-
 def create_convolutional_net():
     return ConvNet()
 
+def create_roberta_base():
+    model = RobertaModel.from_pretrained("roberta-base", device_map="auto", low_cpu_mem_usage=True, torch_dtype=float16)
+    tokenizer = RobertaTokenizerFast.from_pretrained("roberta-base", add_prefix_space=True)
+    return model, tokenizer
 
 def create_model(model_name, bnb):
     model = LlamaModel.from_pretrained(

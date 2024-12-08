@@ -8,12 +8,14 @@ import data.dataset_preprocessor as data_preprocessor
 from data.data_processors import process_twitter2017_text, process_twitter2017_image
 from data.dataset import load_twitter_dataset
 from model.configuration.quantization import create_default_quantization_config, create_parameter_efficient_model
-from model.model_factory import (create_model, create_model_for_lm)
+from model.model_factory import (create_model, create_model_for_lm, create_roberta_base)
 from model.multimodal.text_image_model import CombinedModel
 from model.util import load_and_filter_state_dict, create_message
 from model.visual.convolutional_net import ConvNet
 from security.token_manager import TokenManager
 from train import train
+from train.train import training_loop_combined
+
 
 async def inference(model_path):
     model_name = "meta-llama/Llama-3.1-8B"
@@ -41,6 +43,17 @@ async def preprocess_twitter():
     end = time.time()
     print(f"Loading took: {(end - start) * 1000} ms")
 
+async def create_roberta_multimodal():
+    #print("Loading dataset")
+    data, labels = await load_twitter_dataset()
+    #print("Dataset loaded")
+    token_manager = TokenManager()
+    login(token_manager.get_access_token())
+    model, tokenizer = create_roberta_base()
+    cnn = ConvNet()
+    combined = CombinedModel(cnn, model, len(labels.keys()))
+    training_loop_combined(combined, data["train"], data["val"], tokenizer)
+    print("dsadsa")
 
 async def main():
     '''
@@ -89,4 +102,4 @@ async def ner_prompt():
     print(answer)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(create_roberta_multimodal())
