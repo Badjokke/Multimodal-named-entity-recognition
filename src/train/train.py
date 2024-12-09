@@ -18,10 +18,10 @@ def align_labels(word_ids, labels):
     return padded_labels
 
 def _create_optimizer(parameters: Iterable[torch.Tensor], learning_rate=1e-5, momentum=0.9) -> torch.optim.Optimizer:
-    return torch.optim.SGD(parameters, lr=learning_rate, momentum=momentum)
+    return torch.optim.SGD(parameters, lr=learning_rate, momentum=momentum, weight_decay=0.01)
 
-def _create_adamw_optimizer(parameters: Iterable[torch.Tensor], learning_rate=2e-5) -> torch.optim.AdamW:
-    return torch.optim.AdamW(parameters, lr=learning_rate, weight_decay=0.01)
+def _create_adamw_optimizer(parameters: Iterable[torch.Tensor], learning_rate=5e-3) -> torch.optim.AdamW:
+    return torch.optim.AdamW(parameters, lr=learning_rate)
 
 def _create_scheduler(optimizer, t_max) -> torch.optim.lr_scheduler.CosineAnnealingLR:
     return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=t_max)
@@ -31,7 +31,7 @@ def training_loop_combined(model: torch.nn.Module, train_data, validation_data, 
     model.to(device)
 
     loss_criterion = _create_cross_entropy_loss_criterion(None)
-    optimizer = _create_adamw_optimizer(model.parameters())
+    optimizer = _create_optimizer(model.parameters())
     scheduler = _create_scheduler(optimizer, t_max=epochs * len(train_data))
 
     mean_loss = 0
