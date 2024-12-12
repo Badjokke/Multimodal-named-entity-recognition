@@ -1,6 +1,7 @@
-from typing import Iterable
+from typing import Iterable, Union
 
 import torch
+from peft import PeftModel
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -26,7 +27,7 @@ def _create_adamw_optimizer(parameters: Iterable[torch.Tensor], learning_rate=5e
 def _create_scheduler(optimizer, t_max) -> torch.optim.lr_scheduler.CosineAnnealingLR:
     return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=t_max)
 
-def training_loop_combined(model: torch.nn.Module, train_data, validation_data, tokenizer, epochs=10, patience=3):
+def training_loop_combined(model: Union[torch.nn.Module, PeftModel], train_data, validation_data, tokenizer, epochs=10, patience=3):
     model.train()
     model.to(device)
 
@@ -96,11 +97,11 @@ def validate_after_epoch(model, tokenizer,  loss_criterion, validation_data):
         images, labels, text = data_sample[1].to(device), data_sample[2].to(device), tokenizer(data_sample[0],
                                                                                                return_tensors="pt",
                                                                                                is_split_into_words=True)
-        labels = torch.tensor(align_labels(text.word_ids(),labels))
+        labels = torch.tensor(align_labels(text.word_ids(),labels), device=device)
         text = {key: value.to(device) for key, value in text.items()}
 
         outputs = model(images, text)
-        loss += loss_criterion(outputs.unsqueeze(0), labels)
+        loss += loss_criterion(outputs.squeeze(0), labels)
 
     return loss / len(validation_data)
 
