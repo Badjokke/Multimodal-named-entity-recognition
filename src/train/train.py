@@ -44,7 +44,7 @@ def training_loop_combined(model: torch.nn.Module, train_data, validation_data, 
 
         loss = perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, scheduler)
         loss = loss / len(train_data)
-        val_loss = validate_after_epoch(model, tokenizer, validation_data, loss_criterion)
+        val_loss = validate_after_epoch(model, tokenizer,loss_criterion, validation_data )
 
         print(f"[epoch: {epoch + 1}] Validation loss: {val_loss}")
         print(f"[epoch: {epoch + 1}] Training loss: {loss}")
@@ -96,7 +96,7 @@ def validate_after_epoch(model, tokenizer,  loss_criterion, validation_data):
         images, labels, text = data_sample[1].to(device), data_sample[2].to(device), tokenizer(data_sample[0],
                                                                                                return_tensors="pt",
                                                                                                is_split_into_words=True)
-        labels = align_labels(text.word_ids(),labels)
+        labels = torch.tensor(align_labels(text.word_ids(),labels))
         text = {key: value.to(device) for key, value in text.items()}
 
         outputs = model(images, text)

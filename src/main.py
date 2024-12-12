@@ -53,7 +53,6 @@ async def create_roberta_multimodal():
     cnn = ConvNet()
     combined = CombinedModel(cnn, model, len(labels.keys()))
     training_loop_combined(combined, data["train"], data["val"], tokenizer)
-    print("dsadsa")
 
 async def main():
     '''
