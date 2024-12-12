@@ -1,6 +1,6 @@
 from torch import float16
-from transformers import LlamaForTokenClassification, LlamaTokenizerFast, AutoTokenizer, LlamaModel, LlamaForCausalLM, \
-    RobertaTokenizerFast, RobertaModel
+from transformers import AutoTokenizer, LlamaModel, LlamaForCausalLM, \
+    RobertaTokenizerFast, RobertaModel, ViTImageProcessor, ViTModel
 
 from model.visual.convolutional_net import ConvNet
 
@@ -8,6 +8,11 @@ from model.visual.convolutional_net import ConvNet
 # label2id = {'O': 0, 'B-PER': 1, 'I-PER': 2, 'B-ORG': 3, 'I-ORG': 4, 'B-LOC': 5, 'I-LOC': 6, 'B-MISC': 7, 'I-MISC': 8}
 # id2label = {v: k for k, v in label2id.items()}
 
+def create_vit():
+    model_name = "google/vit-base-patch16-224-in21k"
+    processor = ViTImageProcessor.from_pretrained(model_name)
+    model = ViTModel.from_pretrained(model_name)
+    return model, processor
 
 def create_convolutional_net():
     return ConvNet()

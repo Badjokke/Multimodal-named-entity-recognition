@@ -45,9 +45,9 @@ def training_loop_combined(model: Union[torch.nn.Module, PeftModel], train_data,
 
         loss = perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, scheduler)
         loss = loss / len(train_data)
-        val_loss = validate_after_epoch(model, tokenizer,loss_criterion, validation_data )
+        #val_loss = validate_after_epoch(model, tokenizer,loss_criterion, validation_data )
 
-        print(f"[epoch: {epoch + 1}] Validation loss: {val_loss}")
+        #print(f"[epoch: {epoch + 1}] Validation loss: {val_loss}")
         print(f"[epoch: {epoch + 1}] Training loss: {loss}")
 
         if loss > previous_loss:
@@ -56,7 +56,7 @@ def training_loop_combined(model: Union[torch.nn.Module, PeftModel], train_data,
         else: no_improvement_counter = 0
 
         mean_loss += loss
-    print(f"Average loss: {mean_loss}")
+    print(f"Average loss: {mean_loss/epochs}")
     return model
 
 def early_stop():
@@ -88,7 +88,7 @@ def perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, sched
         scheduler.step()
 
     return running_loss
-
+#todo consumes too much memory
 def validate_after_epoch(model, tokenizer,  loss_criterion, validation_data):
     model.eval()
     loss = 0.
@@ -108,7 +108,7 @@ def validate_after_epoch(model, tokenizer,  loss_criterion, validation_data):
 
 def inference_loop_combined_model(model: torch.nn.Module, test_data, tokenizer):
     model.eval()
-    loss_criterion = _create_cross_entropy_loss_criterion()
+    loss_criterion = _create_cross_entropy_loss_criterion(None)
     y_predicted = []
     y_actual = []
     for i in range(len(test_data)):

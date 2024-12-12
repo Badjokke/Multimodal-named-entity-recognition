@@ -22,7 +22,7 @@ def _process_image(image_binary: bytes, extension: str) -> bytes:
     if not extension.startswith('.'):
         extension = '.' + extension
     img_decoded = opencv.imdecode(np.frombuffer(image_binary, dtype=np.uint8), opencv.IMREAD_COLOR)
-    buffer = opencv.resize(img_decoded, (256, 256))
+    buffer = opencv.resize(img_decoded, (224, 224))
     success, buffer = opencv.imencode(extension, buffer)
     if not success:
         raise Exception("Better exception in future.")
