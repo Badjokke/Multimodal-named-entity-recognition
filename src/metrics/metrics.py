@@ -1,45 +1,26 @@
-from functools import reduce
-
 from torch import Tensor
-
+from .confusion_matrix import ConfusionMatrix
 class Metrics:
-    def __init__(self, y_pred: list[Tensor], y_true: list[Tensor], label_count:int ):
+    def __init__(self, y_pred: list[Tensor], y_true: list[Tensor], label_count:int, id_to_label: dict[int, str] ):
         self.y_pred = y_pred
         self.y_true = y_true
         self.label_count = label_count
+        self.id_to_label = id_to_label
 
-    def __create_matrix(self) -> list[list[int]]:
-        return [[0 for __ in range(self.label_count)] for _ in range(self.label_count)]
-
-    def confusion_matrix(self):
+    def confusion_matrix(self, ) -> ConfusionMatrix:
         assert len(self.y_pred) == len(self.y_true), "y_pred and y_true must have same amount of samples"
-        matrix = self.__create_matrix()
-        for i in range(len(self.y_true)):
-            for j in range(len(self.y_true[i])):
-                true_label = self.y_true[i][j]
-                pred_label = self.y_pred[i][j]
-                matrix[true_label][pred_label] += 1
-        return matrix
+        return ConfusionMatrix(self.y_pred, self.y_true, self.label_count, self.id_to_label)
 
-    def print_confusion_matrix(self, confusion_matrix:list[list[int]], id_to_labels:dict[int, str]):
-        assert id_to_labels is not None, "id_to_labels arg cant be None"
-        labels = " ".join([label for label in id_to_labels.values()])
-        rows = ""
-        for i in range(self.label_count):
-            row_as_str = ", ".join((str(x) for x in confusion_matrix[i]))
-            row = f"{id_to_labels[i]}\t{row_as_str}\n"
-            rows += row
-        print(f"\t {labels}\n{rows}")
-
-    def f1(self, confusion_matrix:list[list[int]], id_to_labels:dict[int, str]):
-        assert id_to_labels is not None, "id_to_labels arg cant be None"
-        #labels = " ".join([label for label in id_to_labels.values()])
-        p = self.__precision(confusion_matrix, 0)
-        r = self.__recall(confusion_matrix, 0)
+    def f1(self, confusion_matrix: ConfusionMatrix, label: int) -> dict[str, float]:
+        assert 0 <= label < self.label_count, f"Label must be between 0 and {self.label_count}"
+        matrix = confusion_matrix.get_matrix()
+        p = self.__precision(matrix, 0)
+        r = self.__recall(matrix, 0)
         f1 = 2 * p * r / (p + r)
-        print(f"\t {p}\t{r}\t{f1}")
+        return {'f1': f1, 'precision': p, 'recall': r}
 
-
+    def macro_f1(self, confusion_matrix: ConfusionMatrix) -> float:
+        pass
 
     def __precision(self,confusion_matrix: list[list[int]], label: int) -> float:
         tp = confusion_matrix[label][label]

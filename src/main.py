@@ -1,21 +1,23 @@
-import asyncio
 import time
 from random import randint
+
 import torch
 from huggingface_hub import login
+
 import data.dataset_preprocessor as data_preprocessor
 from data.data_processors import process_twitter2017_text, process_twitter2017_image
 from data.dataset import load_twitter_dataset
+from metrics.metrics import Metrics
 from model.configuration.quantization import create_default_quantization_config, create_parameter_efficient_model
 from model.model_factory import (create_model, create_model_for_lm, create_roberta_base, create_vit)
 from model.multimodal.text_image_model import CombinedModel
 from model.util import load_and_filter_state_dict, create_message
 from model.visual.convolutional_net import ConvNet
-from model.visual.vit_wrapper import  ViT
+from model.visual.vit_wrapper import ViT
 from security.token_manager import TokenManager
 from train import train
 from train.train import training_loop_combined
-from metrics.metrics import Metrics
+
 
 async def inference(model_path):
     model_name = "meta-llama/Llama-3.1-8B"
@@ -91,6 +93,7 @@ async def main():
 def merge_lora_layers_with_text_model(combined_model: CombinedModel) -> torch.nn.Module:
     return combined_model.text_model.merge_and_unload()
 
+
 async def llama_vit_multimodal():
     model_name = "meta-llama/Llama-3.1-8B"
     print("Loading dataset")
@@ -107,7 +110,7 @@ async def llama_vit_multimodal():
     model, tokenizer = create_model(model_name, create_default_quantization_config())
     combined = CombinedModel(vit, create_parameter_efficient_model(model), len(labels.keys()))
     print("Training combined model")
-    combined = train.training_loop_combined(combined, data['train'], data["val"], tokenizer,epochs=1)
+    combined = train.training_loop_combined(combined, data['train'], data["val"], tokenizer, epochs=1)
     combined.text_model = merge_lora_layers_with_text_model(combined)
     print("Saving model")
     MODEL_OUT_PATH = "./combined_model_llama_vit.pth"
@@ -146,17 +149,16 @@ async def run_vit():
 
 
 if __name__ == "__main__":
-
     y_pred = []
     y_true = []
     for i in range(20):
-        l = randint(9, 20)
+        l = randint(3, 20)
         y_pred.append(torch.argmax(create_random_tensors((l, 3)), dim=-1))
         y_true.append(create_random_tensors((l,)))
-    m = Metrics(y_pred,y_true, 3)
+    m = Metrics(y_pred, y_true, 3, {0: "dog", 1: "cat", 2: "horse"})
     matrix = m.confusion_matrix()
-    m.print_confusion_matrix(matrix, {0:"OTHER", 1:"B-PER", 2:"B-MIS", 3: "I-MIS", 4: "B-ORG", 5: "I-ORG", 6: "B-LOC", 7: "I-PER", 8: "I-LOC"})
-    m.f1(matrix,{0:"OTHER", 1:"B-PER", 2:"B-MIS", 3: "I-MIS", 4: "B-ORG", 5: "I-ORG", 6: "B-LOC", 7: "I-PER", 8: "I-LOC"} )
+    matrix.print_matrix()
+    m.f1(matrix,0)
     # asyncio.run(create_roberta_multimodal())
 
-    #asyncio.run(llama_vit_multimodal())
+    # asyncio.run(llama_vit_multimodal())
