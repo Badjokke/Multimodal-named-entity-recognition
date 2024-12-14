@@ -28,8 +28,8 @@ def _create_scheduler(optimizer, t_max) -> torch.optim.lr_scheduler.CosineAnneal
     return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=t_max)
 
 def training_loop_combined(model: Union[torch.nn.Module, PeftModel], train_data, validation_data, tokenizer, epochs=10, patience=3):
-    model.train()
     model.to(device)
+    model.train()
 
     loss_criterion = _create_cross_entropy_loss_criterion(None)
     optimizer = _create_optimizer(model.parameters())
@@ -64,7 +64,6 @@ def early_stop():
 
 
 def perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, scheduler):
-    model.train()
     running_loss = 0.0
     for i in range(len(train_data)):
         data_sample = train_data[i]
@@ -88,6 +87,7 @@ def perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, sched
         scheduler.step()
 
     return running_loss
+
 #todo consumes too much memory
 def validate_after_epoch(model, tokenizer,  loss_criterion, validation_data):
     model.eval()

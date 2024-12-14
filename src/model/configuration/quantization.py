@@ -20,8 +20,10 @@ def _create_lora_config() -> LoraConfig:
     config = LoraConfig(
         r=16,
         lora_alpha=32,
+        target_modules=["q_proj", "v_proj", "k_proj", "o_proj"],
         lora_dropout=0.1,
-        target_modules=['q_proj', 'k_proj', 'v_proj'], # this allows us to adjust weights for matrices used in attention computation
+        bias="none",
+        task_type=TaskType.FEATURE_EXTRACTION
     )
     return config
 

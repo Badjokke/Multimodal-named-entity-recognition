@@ -1,9 +1,8 @@
 import asyncio
 import time
-
+from random import randint
 import torch
 from huggingface_hub import login
-
 import data.dataset_preprocessor as data_preprocessor
 from data.data_processors import process_twitter2017_text, process_twitter2017_image
 from data.dataset import load_twitter_dataset
@@ -16,7 +15,7 @@ from model.visual.vit_wrapper import  ViT
 from security.token_manager import TokenManager
 from train import train
 from train.train import training_loop_combined
-
+from metrics.metrics import Metrics
 
 async def inference(model_path):
     model_name = "meta-llama/Llama-3.1-8B"
@@ -89,6 +88,9 @@ async def main():
     # text_input = tokenizer(" ".join(text[1][0][0][0]), return_tensors="pt")
 
 
+def merge_lora_layers_with_text_model(combined_model: CombinedModel) -> torch.nn.Module:
+    return combined_model.text_model.merge_and_unload()
+
 async def llama_vit_multimodal():
     model_name = "meta-llama/Llama-3.1-8B"
     print("Loading dataset")
@@ -103,12 +105,12 @@ async def llama_vit_multimodal():
     # cnn(torch.rand(3, 256, 256))
     print("Creating model")
     model, tokenizer = create_model(model_name, create_default_quantization_config())
-    combined = create_parameter_efficient_model(CombinedModel(vit, model, len(labels.keys())))
+    combined = CombinedModel(vit, create_parameter_efficient_model(model), len(labels.keys()))
     print("Training combined model")
-    combined = train.training_loop_combined(combined, data['train'], data["val"], tokenizer)
-    combined.merge_and_unload()
+    combined = train.training_loop_combined(combined, data['train'], data["val"], tokenizer,epochs=1)
+    combined.text_model = merge_lora_layers_with_text_model(combined)
     print("Saving model")
-    MODEL_OUT_PATH = "./combined_model.pth"
+    MODEL_OUT_PATH = "./combined_model_llama_vit.pth"
     torch.save(combined.state_dict(), MODEL_OUT_PATH)
     print("Leaving")
 
@@ -131,7 +133,7 @@ async def ner_prompt():
 
 
 def create_random_tensors(dim: tuple) -> torch.Tensor:
-    return torch.randint(low=1, high=9, size=dim, dtype=torch.int)
+    return torch.randint(low=0, high=3, size=dim, dtype=torch.int)
 
 
 async def run_vit():
@@ -144,18 +146,17 @@ async def run_vit():
 
 
 if __name__ == "__main__":
-    '''
+
     y_pred = []
     y_true = []
-    for i in range(100):
+    for i in range(20):
         l = randint(9, 20)
-        y_pred.append(create_random_tensors((l, 9)))
+        y_pred.append(torch.argmax(create_random_tensors((l, 3)), dim=-1))
         y_true.append(create_random_tensors((l,)))
-    y_pred = torch.from_numpy(np.array(y_pred, dtype=np.int8))
-    y_true = torch.from_numpy(np.array(y_true))
-    m = Metrics(torch.argmax(y_pred,dim = -1), torch.from_numpy(y_true))
-    acc, f1 =  m.f1(), m.acc()
-    print(f"acc: {acc}, f1: {f1}")
+    m = Metrics(y_pred,y_true, 3)
+    matrix = m.confusion_matrix()
+    m.print_confusion_matrix(matrix, {0:"OTHER", 1:"B-PER", 2:"B-MIS", 3: "I-MIS", 4: "B-ORG", 5: "I-ORG", 6: "B-LOC", 7: "I-PER", 8: "I-LOC"})
+    m.f1(matrix,{0:"OTHER", 1:"B-PER", 2:"B-MIS", 3: "I-MIS", 4: "B-ORG", 5: "I-ORG", 6: "B-LOC", 7: "I-PER", 8: "I-LOC"} )
     # asyncio.run(create_roberta_multimodal())
-    '''
-    asyncio.run(llama_vit_multimodal())
+
+    #asyncio.run(llama_vit_multimodal())
