@@ -159,6 +159,7 @@ if __name__ == "__main__":
     matrix = m.confusion_matrix()
     matrix.print_matrix()
     m.f1(matrix,0)
+    print(m.macro_f1(matrix))
     # asyncio.run(create_roberta_multimodal())
 
     # asyncio.run(llama_vit_multimodal())
