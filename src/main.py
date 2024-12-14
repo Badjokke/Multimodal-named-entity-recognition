@@ -3,11 +3,12 @@ from random import randint
 
 import torch
 from huggingface_hub import login
-
+from metrics.plot_builder import PlotBuilder
 import data.dataset_preprocessor as data_preprocessor
 from data.data_processors import process_twitter2017_text, process_twitter2017_image
 from data.dataset import load_twitter_dataset
 from metrics.metrics import Metrics
+from metrics.plots import SimplePlot
 from model.configuration.quantization import create_default_quantization_config, create_parameter_efficient_model
 from model.model_factory import (create_model, create_model_for_lm, create_roberta_base, create_vit)
 from model.multimodal.text_image_model import CombinedModel
@@ -149,6 +150,12 @@ async def run_vit():
 
 
 if __name__ == "__main__":
+    x = [[1,2,3],[3,2,1]]
+    y = [[1,2,3],[1,2,3]]
+    simple_plot = PlotBuilder.build_simple_plot(x,y, colors=["gold","red"])
+    simple_plot.plot()
+
+    '''
     y_pred = []
     y_true = []
     for i in range(20):
@@ -163,3 +170,4 @@ if __name__ == "__main__":
     # asyncio.run(create_roberta_multimodal())
 
     # asyncio.run(llama_vit_multimodal())
+    '''
