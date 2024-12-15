@@ -20,6 +20,9 @@ class SimplePlot:
         plt.ylabel(self.__get_y_axis_label())
         plt.title(self.__get_plot_title())
         self.__plot_data()
+        plt.ylim(ymin=0)
+        plt.xlim(xmin=0)
+        plt.xticks(self.x[0])
         plt.legend(loc="best")
         plt.show()
 
