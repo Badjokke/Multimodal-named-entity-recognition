@@ -1,13 +1,14 @@
+import asyncio
 import time
 from random import randint
 
 import torch
 from huggingface_hub import login
-from metrics.plot_builder import PlotBuilder
-import data.dataset_preprocessor as data_preprocessor
-from data.data_processors import process_twitter2017_text, process_twitter2017_image
+
 from data.dataset import load_twitter_dataset
+from data.dataset_preprocessor import TwitterPreprocessor
 from metrics.metrics import Metrics
+from metrics.plot_builder import PlotBuilder
 from metrics.plots import SimplePlot
 from model.configuration.quantization import create_default_quantization_config, create_parameter_efficient_model
 from model.model_factory import (create_model, create_model_for_lm, create_roberta_base, create_vit)
@@ -42,7 +43,9 @@ async def inference(model_path):
 async def preprocess_twitter():
     print("Loading dataset, image and text")
     start = time.time()
-    await data_preprocessor.load_twitter_dataset(process_twitter2017_text, process_twitter2017_image)
+    preprocessor = TwitterPreprocessor()
+    await preprocessor.load_twitter_dataset()
+    # await data_preprocessor.load_twitter_dataset(process_twitter2017_text, process_twitter2017_image)
     end = time.time()
     print(f"Loading took: {(end - start) * 1000} ms")
 
@@ -149,13 +152,21 @@ async def run_vit():
     print(embedding)
 
 
-if __name__ == "__main__":
-    x = [[1,2,3],[3,2,1]]
-    y = [[1,2,3],[1,2,3]]
-    simple_plot = PlotBuilder.build_simple_plot(x,y, colors=["gold","red"])
+def draw_dummy_diagram():
+    x = [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]]
+    y = [[1.5788260523967825, 1.313030738320009, 1.2059657401559953, 1.1473848533745683, 1.1107720396701792,
+          1.0869205966486934, 1.07328355824383, 1.0652151519363022, 1.0608894993171447, 1.0601054522304882]]
+    simple_plot: SimplePlot = PlotBuilder.build_simple_plot(x, y,
+                                                            colors=["blue"],
+                                                            x_axis_label="epoch",
+                                                            y_axis_label="loss",
+                                                            plot_title="Vit+Llama training",
+                                                            labels=["training_loss"]
+                                                            )
     simple_plot.plot()
 
-    '''
+
+def conf_matrix_f1():
     y_pred = []
     y_true = []
     for i in range(20):
@@ -165,9 +176,20 @@ if __name__ == "__main__":
     m = Metrics(y_pred, y_true, 3, {0: "dog", 1: "cat", 2: "horse"})
     matrix = m.confusion_matrix()
     matrix.print_matrix()
-    m.f1(matrix,0)
+    m.f1(matrix, 0)
     print(m.macro_f1(matrix))
+
+
+if __name__ == "__main__":
+    asyncio.run(preprocess_twitter())
+    """
+    random_input = torch.LongTensor([1, 2, 3, 4, 5, 6, 7])
+    lstm = create_lstm(24)
+    features = lstm(random_input)
+    print(features)
+    """
+    """
     # asyncio.run(create_roberta_multimodal())
 
     # asyncio.run(llama_vit_multimodal())
-    '''
+    """

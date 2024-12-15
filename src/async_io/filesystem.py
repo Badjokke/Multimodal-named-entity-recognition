@@ -44,7 +44,6 @@ async def load_directory_contents(path: str, queue: asyncio.Queue):
     await _load_directory_contents(path, queue, load_file)
 
 
-# todo read all files at once
 async def load_directory_contents_generator(path: str, queue: asyncio.Queue):
     children = os.listdir(path)
     for i in range(0, len(children)):

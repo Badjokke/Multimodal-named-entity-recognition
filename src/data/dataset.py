@@ -10,9 +10,6 @@ from data.data_processors import image_to_tensor, parse_twitter_text
 input_path = "../dataset/preprocessed/twitter_2017"
 
 
-# Load the databricks dataset from Hugging Face
-
-
 async def load_twitter_dataset() -> tuple:
     text_set, image_set = await asyncio.gather(_load_twitter_dataset_text(), _load_twitter_dataset_image())
     return _prepare_twitter_dataset_for_training(text_set, image_set)

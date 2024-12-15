@@ -3,6 +3,7 @@ from transformers import AutoTokenizer, LlamaModel, LlamaForCausalLM, \
     RobertaTokenizerFast, RobertaModel, ViTImageProcessor, ViTModel
 
 from model.visual.convolutional_net import ConvNet
+from model.language.lstm import LSTM
 
 
 def create_vit():
@@ -13,6 +14,9 @@ def create_vit():
 
 def create_convolutional_net():
     return ConvNet()
+
+def create_lstm(vocab_size, bidirectional=True):
+    return LSTM(vocab_size,bidirectional)
 
 def create_roberta_base():
     model = RobertaModel.from_pretrained("roberta-base", device_map="auto", low_cpu_mem_usage=True, torch_dtype=float16)
