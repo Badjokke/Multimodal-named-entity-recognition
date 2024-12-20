@@ -13,7 +13,7 @@ class CombinedModel(torch.nn.Module):
             torch.nn.Linear(visual_model.output_size + text_model.config.hidden_size, 1024),
             torch.nn.ReLU(),
             torch.nn.LayerNorm(1024),
-            torch.nn.Dropout(0.3)
+            torch.nn.Dropout(0.5)
         )
 
 

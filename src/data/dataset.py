@@ -14,6 +14,9 @@ async def load_twitter_dataset() -> tuple:
     text_set, image_set = await asyncio.gather(_load_twitter_dataset_text(), _load_twitter_dataset_image())
     return _prepare_twitter_dataset_for_training(text_set, image_set)
 
+async def dataset_text_only()->tuple:
+    text_set = await asyncio.gather(_load_twitter_dataset_text())
+    return _prepare_twitter_dataset_for_training_text(text_set[0])
 
 async def _load_twitter_dataset_text():
     text_path = f"{input_path}/text_preprocessed"
@@ -60,6 +63,23 @@ async def _load_twitter_text(text_processor: Callable[[str], Future[tuple[list[s
         wrapper[item[0].split("_")[-1].split(".")[0]] = result
     return wrapper
 
+def _prepare_twitter_dataset_for_training_text(text_set: dict[str, dict[str]])->tuple[dict[str, list], dict[str, int]]:
+    final_dataset = {}
+    labels = {}
+    label_id = 0
+    for key in text_set:
+        jsonl_file = text_set[key]
+        final_dataset[key] = []
+        for json in jsonl_file:
+            sentence_labels = json['label']
+            sentence_labels_id = []
+            for label in sentence_labels:
+                if label not in labels:
+                    labels[label] = label_id
+                    label_id += 1
+                sentence_labels_id.append(labels[label])
+            final_dataset[key].append((json['text'], torch.tensor(sentence_labels_id)))
+    return final_dataset, labels
 
 # todo threads optimisation
 # todo consumes way too much memory
@@ -81,10 +101,11 @@ def _prepare_twitter_dataset_for_training(text_set: dict[str, dict[str]], image_
                     labels[label] = label_id
                     label_id += 1
                 sentence_labels_id.append(labels[label])
+            image_tensors = []
             for image in image_refs:
                 if image not in image_set:
                     print(f"Tensor for image ref: {image} missing!")
                     continue
-                image_tensor = image_set[image]
-                final_dataset[key].append((json['text'], image_tensor, torch.tensor(sentence_labels_id)))
+                image_tensors.append(image_set[image])
+            final_dataset[key].append((json['text'], image_tensors[0],torch.tensor(sentence_labels_id)))
     return final_dataset, labels

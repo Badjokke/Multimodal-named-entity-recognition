@@ -5,20 +5,20 @@ from random import randint
 import torch
 from huggingface_hub import login
 
-from data.dataset import load_twitter_dataset
+from data.dataset import load_twitter_dataset, dataset_text_only
 from data.dataset_preprocessor import TwitterPreprocessor
 from metrics.metrics import Metrics
 from metrics.plot_builder import PlotBuilder
 from metrics.plots import SimplePlot
 from model.configuration.quantization import create_default_quantization_config, create_parameter_efficient_model
-from model.model_factory import (create_model, create_model_for_lm, create_roberta_base, create_vit)
+from model.model_factory import (create_llama_model, create_model_for_lm, create_roberta_base, create_vit, create_mistral, create_token_classification_llama)
 from model.multimodal.text_image_model import CombinedModel
 from model.util import load_and_filter_state_dict, create_message
 from model.visual.convolutional_net import ConvNet
 from model.visual.vit_wrapper import ViT
 from security.token_manager import TokenManager
 from train import train
-from train.train import training_loop_combined
+from train.train import training_loop_combined, training_loop_text_only
 
 
 async def inference(model_path):
@@ -32,7 +32,7 @@ async def inference(model_path):
     cnn = ConvNet()
     # cnn(torch.rand(3, 256, 256))
     print("Creating model")
-    model, tokenizer = create_model(model_name, create_default_quantization_config())
+    model, tokenizer = create_llama_model(model_name, create_default_quantization_config())
     combined = CombinedModel(cnn, model, len(labels.keys()))
 
     state_dict = load_and_filter_state_dict(model_path)
@@ -49,6 +49,23 @@ async def preprocess_twitter():
     end = time.time()
     print(f"Loading took: {(end - start) * 1000} ms")
 
+async def train_llama_classifier_text():
+    model_name = "meta-llama/Llama-3.1-8B"
+    print("Loading dataset")
+    data, labels = await dataset_text_only()
+    print("Dataset loaded")
+    token_manager = TokenManager()
+    login(token_manager.get_access_token())
+
+    model, tokenizer = create_token_classification_llama(model_name, create_default_quantization_config())
+    model = create_parameter_efficient_model(model)
+
+    model = train.training_loop_text_only(model, data["train"], data["val"],tokenizer)
+    model.merge_and_unload()
+    print("Saving model")
+    MODEL_OUT_PATH = "./llama_text.pth"
+    torch.save(model.state_dict(), MODEL_OUT_PATH)
+    print("Leaving")
 
 async def create_roberta_multimodal():
     # print("Loading dataset")
@@ -71,7 +88,8 @@ async def main():
     print(f"Loading took: {(end - start) * 1000} ms")
     exit(1)
     '''
-    model_name = "meta-llama/Llama-3.1-8B"
+    #model_name = "meta-llama/Llama-3.1-8B"
+    model_name = "mistralai/Mistral-7B-v0.1"
     print("Loading dataset")
     data, labels = await load_twitter_dataset()
     print("Dataset loaded")
@@ -82,10 +100,10 @@ async def main():
     cnn = ConvNet()
     # cnn(torch.rand(3, 256, 256))
     print("Creating model")
-    model, tokenizer = create_model(model_name, create_default_quantization_config())
+    model, tokenizer = create_mistral(model_name, create_default_quantization_config())
     combined = create_parameter_efficient_model(CombinedModel(cnn, model, len(labels.keys())))
     print("Training combined model")
-    combined = train.training_loop_combined(combined, data['train'], tokenizer, list(labels.values()))
+    combined = train.training_loop_combined(combined, data['train'], data["val"], tokenizer)
     combined.merge_and_unload()
     print("Saving model")
     MODEL_OUT_PATH = "./combined_model.pth"
@@ -111,10 +129,10 @@ async def llama_vit_multimodal():
     vit = ViT(vit_model, vit_processor)
     # cnn(torch.rand(3, 256, 256))
     print("Creating model")
-    model, tokenizer = create_model(model_name, create_default_quantization_config())
+    model, tokenizer = create_llama_model(model_name, create_default_quantization_config())
     combined = CombinedModel(vit, create_parameter_efficient_model(model), len(labels.keys()))
     print("Training combined model")
-    combined = train.training_loop_combined(combined, data['train'], data["val"], tokenizer, epochs=1)
+    combined = train.training_loop_combined(combined, data['train'], data["val"], tokenizer, epochs=5)
     combined.text_model = merge_lora_layers_with_text_model(combined)
     print("Saving model")
     MODEL_OUT_PATH = "./combined_model_llama_vit.pth"
@@ -181,7 +199,7 @@ def conf_matrix_f1():
 
 
 if __name__ == "__main__":
-    asyncio.run(preprocess_twitter())
+    asyncio.run(train_llama_classifier_text())
     """
     random_input = torch.LongTensor([1, 2, 3, 4, 5, 6, 7])
     lstm = create_lstm(24)
