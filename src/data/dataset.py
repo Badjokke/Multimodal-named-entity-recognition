@@ -6,6 +6,8 @@ import torch
 
 from async_io import filesystem
 from data.data_processors import image_to_tensor, parse_twitter_text
+from data.text_data_processor.stemming_json_data_processor import TwitterStemmingJsonDataProcessor
+from data.data_processor import DataProcessor
 
 input_path = "../dataset/preprocessed/twitter_2017"
 
@@ -14,9 +16,13 @@ async def load_twitter_dataset() -> tuple:
     text_set, image_set = await asyncio.gather(_load_twitter_dataset_text(), _load_twitter_dataset_image())
     return _prepare_twitter_dataset_for_training(text_set, image_set)
 
-async def dataset_text_only()->tuple:
+async def load_twitter_dataset_with_processors(text_processors: list[DataProcessor], image_processor: list[DataProcessor]) -> tuple:
+    pass
+
+async def dataset_text_only() -> tuple:
     text_set = await asyncio.gather(_load_twitter_dataset_text())
     return _prepare_twitter_dataset_for_training_text(text_set[0])
+
 
 async def _load_twitter_dataset_text():
     text_path = f"{input_path}/text_preprocessed"
@@ -63,7 +69,9 @@ async def _load_twitter_text(text_processor: Callable[[str], Future[tuple[list[s
         wrapper[item[0].split("_")[-1].split(".")[0]] = result
     return wrapper
 
-def _prepare_twitter_dataset_for_training_text(text_set: dict[str, dict[str]])->tuple[dict[str, list], dict[str, int]]:
+
+def _prepare_twitter_dataset_for_training_text(text_set: dict[str, dict[str]]) -> tuple[
+    dict[str, list], dict[str, int]]:
     final_dataset = {}
     labels = {}
     label_id = 0
@@ -81,13 +89,15 @@ def _prepare_twitter_dataset_for_training_text(text_set: dict[str, dict[str]])->
             final_dataset[key].append((json['text'], torch.tensor(sentence_labels_id)))
     return final_dataset, labels
 
+
 # todo threads optimisation
 # todo consumes way too much memory
 # this just feels wrong, rewrite
 def _prepare_twitter_dataset_for_training(text_set: dict[str, dict[str]], image_set: dict[str, torch.Tensor]) -> tuple[
-    dict[str, list], dict[str, int]]:
+    dict[str, list], dict[str, int], list[int]]:
     final_dataset = {}
     labels = {}
+    class_occurrences = []
     label_id = 0
     for key in text_set:
         jsonl_file = text_set[key]
@@ -100,6 +110,7 @@ def _prepare_twitter_dataset_for_training(text_set: dict[str, dict[str]], image_
                 if label not in labels:
                     labels[label] = label_id
                     label_id += 1
+                class_occurrences.append(labels[label])
                 sentence_labels_id.append(labels[label])
             image_tensors = []
             for image in image_refs:
@@ -107,5 +118,5 @@ def _prepare_twitter_dataset_for_training(text_set: dict[str, dict[str]], image_
                     print(f"Tensor for image ref: {image} missing!")
                     continue
                 image_tensors.append(image_set[image])
-            final_dataset[key].append((json['text'], image_tensors[0],torch.tensor(sentence_labels_id)))
-    return final_dataset, labels
+            final_dataset[key].append((json['text'], image_tensors[0], torch.tensor(sentence_labels_id)))
+    return final_dataset, labels, class_occurrences

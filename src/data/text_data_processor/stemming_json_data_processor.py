@@ -20,7 +20,6 @@ class TwitterStemmingJsonDataProcessor(DataProcessor):
         related_images = json_value.get('images')
         return json.dumps(self.__stem_text((text[1:-1]).split(","))), json.dumps(related_images), json.dumps(labels)
 
-
     def __stem_text(self, text: list[str]) -> str:
         stemmed_text = []
         for i in range(len(text)):
