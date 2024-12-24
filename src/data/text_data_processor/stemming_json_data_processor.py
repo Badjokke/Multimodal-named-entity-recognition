@@ -1,27 +1,41 @@
 from concurrent.futures import ThreadPoolExecutor, Future
-import json
 from data.data_processor import DataProcessor
 from nltk.stem import PorterStemmer
-
-class TwitterStemmingJsonDataProcessor(DataProcessor):
+from typing import Union
+import re
+class StemmingTextDataProcessor(DataProcessor):
     def __init__(self):
         super().__init__()
         self.io_pool_exec = ThreadPoolExecutor(max_workers=5)
         self.stemmer = PorterStemmer()
 
-    def process_data(self, data: str) -> Future[tuple[str, str, str]]:
+    def process_data(self, data: Union[list[str], str]) -> Future[list[str]]:
         assert data is not None, "Data cannot be None"
-        return self.io_pool_exec.submit(self.__process_json_text, data)
+        return self.io_pool_exec.submit(self.__stem_text if type(data) is list else self.__process_word(data), data)
 
-    def __process_json_text(self, text: str) -> tuple[str, str, str]:
-        json_value = json.loads(text)
-        text = json_value.get('text')
-        labels = json_value.get('label')
-        related_images = json_value.get('images')
-        return json.dumps(self.__stem_text((text[1:-1]).split(","))), json.dumps(related_images), json.dumps(labels)
+    def __process_word(self, text: str) -> list[str]:
+        return [self.__stem_and_filter(text.strip())]
 
-    def __stem_text(self, text: list[str]) -> str:
-        stemmed_text = []
-        for i in range(len(text)):
-            stemmed_text.append(self.stemmer.stem(text[i]))
-        return ",".join(stemmed_text)
+    def __stem_text(self, text: list[str]) -> list[str]:
+        return list(map(lambda x: self.__stem_and_filter(x.strip()), text))
+
+    def __stem_and_filter(self, word: str):
+        if len(word) == 0 or self.__is_email_predicate(word) or self.__is_url_predicate(word) or self.__is_number_predicate(word) or self.__is_nonword_character_predicate(word):
+            return None
+        return self.stemmer.stem(word)
+
+    @staticmethod
+    def __is_email_predicate(text:str):
+        return re.match("\\w+@\\w+\\.\\w+", text)
+
+    @staticmethod
+    def __is_url_predicate(text:str):
+        return re.match("https?://\\S+", text)
+
+    @staticmethod
+    def __is_number_predicate(text:str):
+        return re.match("^\\d+$", text)
+
+    @staticmethod
+    def __is_nonword_character_predicate(text:str):
+        return re.match("^\\W$", text)

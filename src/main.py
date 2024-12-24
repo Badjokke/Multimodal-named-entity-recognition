@@ -7,6 +7,7 @@ from huggingface_hub import login
 
 from data.dataset import load_twitter_dataset, dataset_text_only
 from data.dataset_preprocessor import TwitterPreprocessor
+from data.text_data_processor.stemming_json_data_processor import StemmingTextDataProcessor
 from metrics.metrics import Metrics
 from metrics.plot_builder import PlotBuilder
 from metrics.plots import SimplePlot
@@ -80,6 +81,15 @@ async def create_roberta_multimodal():
 
 def merge_lora_layers_with_text_model(combined_model: CombinedModel) -> torch.nn.Module:
     return combined_model.text_model.merge_and_unload()
+#todo replace words by vocab num
+async def create_vit_lstm_model():
+    data, labels, class_occurrences, vocabulary = await load_twitter_dataset(text_processors=[StemmingTextDataProcessor()])
+    lstm = create_lstm(len(vocabulary))
+    vit, processor = create_vit()
+    vit = ViT(vit, processor)
+    combined = CombinedModel(vit, lstm, len(labels.keys()))
+    combined = training_loop_combined(combined, data["train"], data["val"], None, class_occurrences, epochs=10)
+    combined.save_pretrained("vit_lstm.pth")
 
 
 async def llama_vit_multimodal():
@@ -101,7 +111,7 @@ async def llama_vit_multimodal():
     combined = train.training_loop_combined(combined, data['train'], data["val"], tokenizer,class_occurrences, epochs=10)
     #combined.text_model = merge_lora_layers_with_text_model(combined)
     print("Saving model")
-    model.save_pretrained("peft_finetuned_llama.pth")
+    combined.save_pretrained("peft_finetuned_llama.pth")
     #MODEL_OUT_PATH = "./combined_model_llama_vit.pth"
     #torch.save(combined.state_dict(), MODEL_OUT_PATH)
     print("Leaving")
@@ -144,7 +154,7 @@ def conf_matrix_f1():
     print(m.macro_f1(matrix))
 
 if __name__ == "__main__":
-    asyncio.run(preprocess_twitter())
+    asyncio.run(create_vit_lstm_model())
     """
     random_input = torch.LongTensor([1, 2, 3, 4, 5, 6, 7])
     lstm = create_lstm(24)

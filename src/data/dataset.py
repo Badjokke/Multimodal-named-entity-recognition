@@ -1,23 +1,21 @@
 import asyncio
 from concurrent.futures import Future
-from typing import Callable
+from typing import Callable, Union
 
 import torch
 
 from async_io import filesystem
-from data.data_processors import image_to_tensor, parse_twitter_text
-from data.text_data_processor.stemming_json_data_processor import TwitterStemmingJsonDataProcessor
 from data.data_processor import DataProcessor
+from data.data_processors import image_to_tensor, parse_twitter_text
 
 input_path = "../dataset/preprocessed/twitter_2017"
 
 
-async def load_twitter_dataset() -> tuple:
+async def load_twitter_dataset(text_processors: list[DataProcessor] = None,
+                               image_processor: list[DataProcessor] = None) -> tuple:
     text_set, image_set = await asyncio.gather(_load_twitter_dataset_text(), _load_twitter_dataset_image())
-    return _prepare_twitter_dataset_for_training(text_set, image_set)
+    return _prepare_twitter_dataset_for_training(text_set, image_set, text_processors, image_processor)
 
-async def load_twitter_dataset_with_processors(text_processors: list[DataProcessor], image_processor: list[DataProcessor]) -> tuple:
-    pass
 
 async def dataset_text_only() -> tuple:
     text_set = await asyncio.gather(_load_twitter_dataset_text())
@@ -55,7 +53,7 @@ async def _transform_images(transform_function: Callable[[bytes], Future[torch.t
     return dic
 
 
-async def _load_twitter_text(text_processor: Callable[[str], Future[tuple[list[str], list[str], list[str]]]],
+async def _load_twitter_text(text_processor: Callable[[bytes], Future[list[dict[str, str]]]],
                              queue: asyncio.Queue) -> dict:
     wrapper = {}
     while True:
@@ -90,33 +88,69 @@ def _prepare_twitter_dataset_for_training_text(text_set: dict[str, dict[str]]) -
     return final_dataset, labels
 
 
-# todo threads optimisation
-# todo consumes way too much memory
-# this just feels wrong, rewrite
-def _prepare_twitter_dataset_for_training(text_set: dict[str, dict[str]], image_set: dict[str, torch.Tensor]) -> tuple[
-    dict[str, list], dict[str, int], list[int]]:
+def _prepare_twitter_dataset_for_training(text_set: dict[str, list[dict[str, list[str]]]],
+                                          image_set: dict[str, torch.Tensor],
+                                          text_processor=Union[list[DataProcessor], None],
+                                          image_processor=Union[list[DataProcessor], None]) -> tuple[
+    dict[str, list], dict[str, int], list[int], set[str]]:
     final_dataset = {}
     labels = {}
     class_occurrences = []
-    label_id = 0
+    vocabulary = set()
     for key in text_set:
         jsonl_file = text_set[key]
-        final_dataset[key] = []
-        for json in jsonl_file:
-            image_refs = json['image']
-            sentence_labels = json['label']
-            sentence_labels_id = []
-            for label in sentence_labels:
-                if label not in labels:
-                    labels[label] = label_id
-                    label_id += 1
-                class_occurrences.append(labels[label])
-                sentence_labels_id.append(labels[label])
-            image_tensors = []
-            for image in image_refs:
-                if image not in image_set:
-                    print(f"Tensor for image ref: {image} missing!")
-                    continue
-                image_tensors.append(image_set[image])
-            final_dataset[key].append((json['text'], image_tensors[0], torch.tensor(sentence_labels_id)))
-    return final_dataset, labels, class_occurrences
+        final_dataset[key] = _process_dataset_part(jsonl_file, labels, text_processor, image_processor, image_set)
+        for tpl in final_dataset[key]:
+            words, images, lbls = tpl
+            for word in words:
+                vocabulary.add(word)
+            for lbl in lbls:
+                class_occurrences.append(lbl)
+
+    return final_dataset, labels, class_occurrences, vocabulary
+
+
+def _process_dataset_part(jsonl: list[dict[str, list[str]]], labels: dict[str, int],
+                          text_data_processor: list[DataProcessor], image_data_processor: list[DataProcessor],
+                          image_set: dict[str, torch.Tensor]) -> list[tuple[list[str], torch.Tensor, list[int]]]:
+    result = []
+    for json in jsonl:
+        images = _process_image_refs(image_set, json['image'], image_data_processor)
+        text = _apply_data_processor(json['text'], text_data_processor)
+        collected_labels = _process_labels(json['label'], labels)
+        collected_labels = [label for i, label in enumerate(collected_labels) if text[i] is not None]
+        text = list(filter(lambda x: x is not None, text))
+        assert len(collected_labels) == len(text), "post filtering of labels and text failed - len diff"
+        result.append((text, images, collected_labels))
+    return result
+
+
+def _process_labels(sentence_labels: list[str], labels: dict[str, int]) -> list[int]:
+    collected_labels = []
+    for label in sentence_labels:
+        if label not in labels:
+            labels[label] = len(labels)
+        collected_labels.append(labels[label])
+    return collected_labels
+
+
+def _process_image_refs(image_set: dict[str, torch.Tensor], image_refs: list[str],
+                        image_data_processor: list[DataProcessor], return_first=True) -> torch.Tensor:
+    if return_first:
+        return image_set[image_refs[0]] if image_data_processor is None else [
+            _apply_data_processor(image_set[image_refs[0]], image_data_processor)]
+    return list(
+        map(lambda ref: image_set[ref], image_refs)) if image_data_processor is None else _map_with_data_processor(
+        image_refs, image_data_processor)
+
+
+def _map_with_data_processor(items: list[Union[str, torch.Tensor]], data_processors: list[DataProcessor]):
+    return list(map(lambda item: _apply_data_processor(item, data_processors), items))
+
+
+def _apply_data_processor(item: Union[list[str], torch.Tensor], data_processors: list[DataProcessor]):
+    if data_processors is None or data_processors == []:
+        return item
+    for processor in data_processors:
+        item = processor.process_data(item).result(2000)
+    return item

@@ -9,5 +9,5 @@ class DataProcessor(ABC):
         pass
 
     @abstractmethod
-    def process_data(self, data: Union[bytes, str, Tensor]):
+    def process_data(self, data: Union[bytes, str, Tensor, list[str]]):
         raise NotImplementedError('Method process_data must be implemented')
