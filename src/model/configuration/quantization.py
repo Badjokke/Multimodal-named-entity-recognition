@@ -18,12 +18,11 @@ def _create_lora_config() -> LoraConfig:
     Create Parameter-Efficient Fine-Tuning config for your model
     """
     config = LoraConfig(
-        r=4,
-        lora_alpha=4,
+        r=8,
+        lora_alpha=8,
         target_modules=["q_proj", "v_proj", "k_proj", "o_proj"],
         lora_dropout=0.1,
         bias="none",
-        task_type=TaskType.FEATURE_EXTRACTION
     )
     return config
 
