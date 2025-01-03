@@ -95,7 +95,7 @@ async def create_vit_lstm_model():
 async def llama_vit_multimodal():
     model_name = "meta-llama/Llama-3.1-8B"
     print("Loading dataset")
-    data, labels, class_occurrences = await load_twitter_dataset()
+    data, labels, class_occurrences, vocabulary = await load_twitter_dataset()
     print("Dataset loaded")
 
     # cnn((image[1]["0_0.jpg"][None,:,:,:])/255)
