@@ -3,7 +3,6 @@ from sklearn.utils.class_weight import compute_class_weight
 import torch
 from peft import PeftModel
 import numpy as np
-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def _create_cross_entropy_loss_criterion(y) -> torch.nn.CrossEntropyLoss:
@@ -74,9 +73,9 @@ def training_loop_combined(model: Union[torch.nn.Module, PeftModel], train_data,
     scheduler = _create_scheduler(optimizer, t_max=epochs * len(train_data))
 
     for epoch in range(epochs):
-        loss = perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, scheduler)
         val_loss = validate_after_epoch(model, tokenizer,loss_criterion, validation_data )
-        print(f"[epoch: {epoch + 1}] Training loss: {loss}")
+        training_loss = perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, scheduler)
+        print(f"[epoch: {epoch + 1}] Training loss: {training_loss}")
         print(f"[epoch: {epoch + 1}] Validation loss: {val_loss}")
     return model
 
@@ -88,14 +87,12 @@ def perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, sched
     running_loss = 0.0
     for i in range(len(train_data)):
         data_sample = train_data[i]
-
         images, labels, text = data_sample[1].to(device), torch.tensor(data_sample[2], dtype=torch.long,device=device), tokenizer(data_sample[0], return_tensors="pt", is_split_into_words=True)
         word_ids = text.word_ids()
         text = {key: value.to(device) for key, value in text.items()}
         aligned_labels = torch.tensor(align_labels(word_ids, labels), device=device, dtype=torch.long)
 
         optimizer.zero_grad()
-
         outputs = model(images, text)
         loss = loss_criterion(outputs.squeeze(0), aligned_labels)
         loss.backward()
@@ -107,20 +104,22 @@ def perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, sched
 
     return running_loss / len(train_data)
 
-def validate_after_epoch(model, tokenizer, loss_criterion, validation_data):
+def validate_after_epoch(model, tokenizer, loss_criterion, validation_data) -> tuple[float, tuple[list[torch.Tensor], list[torch.Tensor]]]:
     model.eval()
     loss = 0.
+    y_true, y_pred = [], []
     with torch.no_grad():
         for i in range(len(validation_data)):
             data_sample = validation_data[i]
             images, labels, text = data_sample[1].to(device), torch.tensor(data_sample[2], dtype=torch.long,device=device), tokenizer(data_sample[0], return_tensors="pt", is_split_into_words=True)
-
             labels = torch.tensor(align_labels(text.word_ids(), labels), device=device)
             text = {key: value.to(device) for key, value in text.items()}
 
-            outputs = model(images, text)
-            loss += loss_criterion(outputs.squeeze(0), labels)
-    return loss / len(validation_data)
+            outputs = model(images, text).squeeze(0)
+            loss += loss_criterion(outputs, labels)
+            y_true.append(labels)
+            y_pred.append(torch.argmax(outputs, dim = 1))
+    return loss / len(validation_data), (y_true, y_pred)
 
 # todo wrong
 def decode_labels(word_ids, y_predicted):
