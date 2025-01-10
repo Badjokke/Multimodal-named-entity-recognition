@@ -1,9 +1,19 @@
 from typing import Iterable, Union
-from sklearn.utils.class_weight import compute_class_weight
+
+import numpy as np
 import torch
 from peft import PeftModel
-import numpy as np
+from sklearn.utils.class_weight import compute_class_weight
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+def _compute_inverse_freq_weights(y, alpha=0.5) -> torch.Tensor:
+    weights = [1 / (np.bincount(x) ** alpha) for x in y]
+    return torch.Tensor(weights).to(torch.float32).to(device)
+
+def _compute_class_weights_rare_events(y) -> torch.Tensor:
+    weights = compute_class_weight(class_weight="balanced", classes=np.unique(y), y=y)
+    return torch.from_numpy(weights).to(torch.float32).to(device)
 
 def _create_cross_entropy_loss_criterion(y) -> torch.nn.CrossEntropyLoss:
     weights = compute_class_weight(class_weight="balanced", classes=np.unique(y), y=y)
@@ -23,7 +33,7 @@ def _create_adamw_optimizer(parameters: Iterable[torch.Tensor], learning_rate=1e
     return torch.optim.AdamW(parameters, lr=learning_rate)
 
 def _create_scheduler(optimizer, t_max) -> torch.optim.lr_scheduler.CosineAnnealingLR:
-    return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=t_max)
+    return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=t_max, verbose=True)
 
 def training_loop_text_only(model: Union[torch.nn.Module, PeftModel], train_data, validation_data, tokenizer, epochs=10,
                             patience=3):
@@ -69,12 +79,12 @@ def training_loop_combined(model: Union[torch.nn.Module, PeftModel], train_data,
                            class_occurrences, epochs=10, patience=3):
     model.to(device)
     loss_criterion = _create_cross_entropy_loss_criterion(class_occurrences)
-    optimizer = _create_adamw_optimizer(model.parameters())
+    optimizer =_create_optimizer(model.parameters())
     scheduler = _create_scheduler(optimizer, t_max=epochs * len(train_data))
 
     for epoch in range(epochs):
-        val_loss = validate_after_epoch(model, tokenizer,loss_criterion, validation_data )
         training_loss = perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, scheduler)
+        val_loss = validate_after_epoch(model, tokenizer, loss_criterion, validation_data)
         print(f"[epoch: {epoch + 1}] Training loss: {training_loss}")
         print(f"[epoch: {epoch + 1}] Validation loss: {val_loss}")
     return model
@@ -87,7 +97,10 @@ def perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, sched
     running_loss = 0.0
     for i in range(len(train_data)):
         data_sample = train_data[i]
-        images, labels, text = data_sample[1].to(device), torch.tensor(data_sample[2], dtype=torch.long,device=device), tokenizer(data_sample[0], return_tensors="pt", is_split_into_words=True)
+        images, labels, text = data_sample[1].to(device), torch.tensor(data_sample[2], dtype=torch.long,
+                                                                       device=device), tokenizer(data_sample[0],
+                                                                                                 return_tensors="pt",
+                                                                                                 is_split_into_words=True)
         word_ids = text.word_ids()
         text = {key: value.to(device) for key, value in text.items()}
         aligned_labels = torch.tensor(align_labels(word_ids, labels), device=device, dtype=torch.long)
@@ -104,33 +117,56 @@ def perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, sched
 
     return running_loss / len(train_data)
 
-def validate_after_epoch(model, tokenizer, loss_criterion, validation_data) -> tuple[float, tuple[list[torch.Tensor], list[torch.Tensor]]]:
+def validate_after_epoch(model, tokenizer, loss_criterion, validation_data) -> tuple[
+    float, tuple[list[torch.Tensor], list[torch.Tensor]]]:
     model.eval()
     loss = 0.
     y_true, y_pred = [], []
     with torch.no_grad():
         for i in range(len(validation_data)):
             data_sample = validation_data[i]
-            images, labels, text = data_sample[1].to(device), torch.tensor(data_sample[2], dtype=torch.long,device=device), tokenizer(data_sample[0], return_tensors="pt", is_split_into_words=True)
+            images, labels, text = data_sample[1].to(device), torch.tensor(data_sample[2], dtype=torch.long,
+                                                                           device=device), tokenizer(data_sample[0],
+                                                                                                     return_tensors="pt",
+                                                                                                     is_split_into_words=True)
             labels = torch.tensor(align_labels(text.word_ids(), labels), device=device)
             text = {key: value.to(device) for key, value in text.items()}
 
             outputs = model(images, text).squeeze(0)
             loss += loss_criterion(outputs, labels)
             y_true.append(labels)
-            y_pred.append(torch.argmax(outputs, dim = 1))
-    return loss / len(validation_data), (y_true, y_pred)
+            y_pred.append(torch.argmax(outputs, dim=1))
+    return loss / len(validation_data) #(y_true, y_pred)
 
-# todo wrong
-def decode_labels(word_ids, y_predicted):
-    previous_word_id = None
+def get_occurrence_count(l: list):
+    dic = dict()
+    for n in l:
+        if n not in dic:
+            dic[n] = 0
+        dic[n] += 1
+    return dic
+
+def get_index_of_max_value(dic: dict[int, int]):
+    v = 0
+    i = 0
+    for (key, value) in dic.items():
+        if value > v:
+            v = value
+            i = key
+    return i
+
+def decode_labels_majority_vote(word_ids, y_predicted):
     decoded_labels = []
-    # todo majority vote
-    for i, w_id in enumerate(word_ids):
-        if w_id is None or w_id == previous_word_id:
+    walker = 0
+    while walker < len(word_ids) - 1:
+        current_w_id = word_ids[walker]
+        if current_w_id == -100:
             continue
-        decoded_labels.append(y_predicted[i])
-        previous_word_id = w_id
+        start_index = walker
+        while word_ids[walker + 1] == current_w_id:
+            walker += 1
+        walker += 1
+        decoded_labels.append(get_index_of_max_value(get_occurrence_count(y_predicted[start_index:walker])))
     return torch.tensor(decoded_labels, dtype=torch.long, device=device)
 
 def inference_loop_combined_model(model: torch.nn.Module, test_data, tokenizer):
@@ -146,7 +182,7 @@ def inference_loop_combined_model(model: torch.nn.Module, test_data, tokenizer):
         word_ids = text.word_ids()
         text = {key: value.to(device) for key, value in text.items()}
         outputs = model(images, text)
-        y_pred = decode_labels(word_ids, torch.argmax(outputs.squeeze(0), dim=1))
+        y_pred = decode_labels_majority_vote(word_ids, torch.argmax(outputs.squeeze(0), dim=1))
         y_predicted.append(y_pred)
         y_actual.append(labels)
     return y_actual, y_predicted

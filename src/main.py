@@ -106,14 +106,14 @@ async def llama_vit_multimodal():
     # cnn(torch.rand(3, 256, 256))
     print("Creating vit llama model")
     model, tokenizer = create_llama_model(model_name, create_default_quantization_config())
-    combined = CombinedModel(vit, create_parameter_efficient_model(model), len(labels.keys()))
+    combined = CombinedModel(vit, create_roberta_base(), len(labels.keys()))
     print("Training combined model")
     combined = train.training_loop_combined(combined, data['train'], data["val"], tokenizer,class_occurrences, epochs=10)
     #combined.text_model = merge_lora_layers_with_text_model(combined)
     print("Saving model")
     combined.save_pretrained("peft_finetuned_llama.pth")
-    #MODEL_OUT_PATH = "./combined_model_llama_vit.pth"
-    #torch.save(combined.state_dict(), MODEL_OUT_PATH)
+    MODEL_OUT_PATH = "./combined_model_roberta_vit.pth"
+    torch.save(combined.state_dict(), MODEL_OUT_PATH)
     print("Leaving")
 
 def create_random_tensors(dim: tuple) -> torch.Tensor:
@@ -154,7 +154,7 @@ def conf_matrix_f1():
     print(m.macro_f1(matrix))
 
 if __name__ == "__main__":
-    asyncio.run(create_vit_lstm_model())
+    asyncio.run(llama_vit_multimodal())
     """
     random_input = torch.LongTensor([1, 2, 3, 4, 5, 6, 7])
     lstm = create_lstm(24)
