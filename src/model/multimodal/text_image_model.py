@@ -18,7 +18,8 @@ class CombinedModel(torch.nn.Module):
 
     def forward(self, visual_feats, text_feats):
         visual_out = self.visual_model(visual_feats)
-        text_out = self.text_model(**text_feats).last_hidden_state  #  (sentence_len, hidden_size)
+        #text_out = self.text_model(**text_feats).last_hidden_state  #  (sentence_len, hidden_size)
+        text_out = self.text_model(text_feats).unsqueeze(0)
         visual_out = visual_out.unsqueeze(0).expand(1, text_out.size(1), -1)
         combined = torch.cat([text_out, visual_out], dim=-1)
         fused = self.__fusion_layer(combined)

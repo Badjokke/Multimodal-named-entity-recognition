@@ -75,6 +75,46 @@ def perform_epoch_text_only(model, tokenizer, train_data, loss_criterion, optimi
 
     return running_loss
 
+
+def training_loop_combined_lstm(model: Union[torch.nn.Module, PeftModel], train_data, validation_data, vocabulary,
+                                class_occurrences, epochs=10, patience=3):
+    model.to(device)
+    loss_criterion = _create_cross_entropy_loss_criterion(class_occurrences)
+    optimizer = _create_adamw_optimizer(model.parameters())
+    scheduler = _create_scheduler(optimizer, t_max=epochs * len(train_data))
+
+    for epoch in range(epochs):
+        training_loss = perform_epoch_combined_lstm(model, vocabulary, train_data, loss_criterion, optimizer, scheduler)
+        val_loss = validate_after_epoch(model, vocabulary, loss_criterion, validation_data)
+        print(f"[epoch: {epoch + 1}] Training loss: {training_loss}")
+        print(f"[epoch: {epoch + 1}] Validation loss: {val_loss}")
+
+def perform_epoch_combined_lstm(model, vocabulary, train_data, loss_criterion, optimizer, scheduler):
+    model.train()
+    for i in range(len(train_data)):
+        text, images, labels = torch.tensor(list(map(lambda word: vocabulary[word],train_data[i][0])), dtype=torch.long),train_data[i][1].to(device), torch.tensor(train_data[i][2], dtype=torch.long, device=device)
+        outputs = model(images, text)
+        loss = loss_criterion(outputs.squeeze(0), labels)
+        optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=40.0)
+        optimizer.step()
+        scheduler.step()
+
+def perform_validation_combined_lstm(model, vocabulary, loss_criterion, validation_data):
+    model.eval()
+    loss = 0.
+    y_true, y_pred = [], []
+    with torch.no_grad():
+        for i in range(len(validation_data)):
+            data_sample = validation_data[i]
+            text, images, labels = torch.Tensor(list(map(lambda word: vocabulary[word], data_sample[0])),device=device),torch.tensor(data_sample[2],dtype=torch.long, device=device) ,data_sample[1].to(device)
+            outputs = model(images, text)
+            loss += loss_criterion(outputs.squeeze(0), labels)
+            y_true.append(labels)
+            y_pred.append(torch.argmax(outputs.squeeze(0), dim=1))
+    return loss / len(validation_data)
+
 def training_loop_combined(model: Union[torch.nn.Module, PeftModel], train_data, validation_data, tokenizer,
                            class_occurrences, epochs=10, patience=3):
     model.to(device)
