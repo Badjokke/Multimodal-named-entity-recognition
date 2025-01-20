@@ -19,8 +19,7 @@ from model.visual.convolutional_net import ConvNet
 from model.visual.vit_wrapper import ViT
 from security.token_manager import TokenManager
 from train import train
-from train.train import training_loop_combined, training_loop_text_only
-
+from train.train import training_loop_combined,training_loop_combined_lstm
 
 async def inference(model_path):
     model_name = "meta-llama/Llama-3.1-8B"
@@ -81,14 +80,14 @@ async def create_roberta_multimodal():
 
 def merge_lora_layers_with_text_model(combined_model: CombinedModel) -> torch.nn.Module:
     return combined_model.text_model.merge_and_unload()
-#todo replace words by vocab num
+
 async def create_vit_lstm_model():
     data, labels, class_occurrences, vocabulary = await load_twitter_dataset(text_processors=[StemmingTextDataProcessor()])
-    lstm = create_lstm(len(vocabulary))
+    lstm = create_lstm(len(vocabulary.keys()))
     vit, processor = create_vit()
     vit = ViT(vit, processor)
     combined = CombinedModel(vit, lstm, len(labels.keys()))
-    combined = training_loop_combined(combined, data["train"], data["val"], None, class_occurrences, epochs=10)
+    combined = training_loop_combined_lstm(combined, data["train"], data["val"], vocabulary, class_occurrences, epochs=10)
     combined.save_pretrained("vit_lstm.pth")
 
 async def llama_vit_multimodal():
@@ -151,7 +150,7 @@ def conf_matrix_f1():
     print(m.macro_f1(matrix))
 
 if __name__ == "__main__":
-    asyncio.run(llama_vit_multimodal())
+    asyncio.run(create_vit_lstm_model())
     """
     random_input = torch.LongTensor([1, 2, 3, 4, 5, 6, 7])
     lstm = create_lstm(24)
