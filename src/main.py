@@ -14,7 +14,7 @@ from metrics.plots import SimplePlot
 from model.configuration.quantization import create_default_quantization_config, create_parameter_efficient_model
 from model.model_factory import (create_llama_model, create_roberta_base, create_vit, create_token_classification_llama, create_lstm)
 from model.multimodal.text_image_model import CombinedModel
-from model.util import load_and_filter_state_dict, create_message
+from model.util import load_and_filter_state_dict, save_model, create_message
 from model.visual.convolutional_net import ConvNet
 from model.visual.vit_wrapper import ViT
 from security.token_manager import TokenManager
@@ -91,30 +91,27 @@ async def create_vit_lstm_model():
     combined = training_loop_combined(combined, data["train"], data["val"], None, class_occurrences, epochs=10)
     combined.save_pretrained("vit_lstm.pth")
 
-
 async def llama_vit_multimodal():
     model_name = "meta-llama/Llama-3.1-8B"
     print("Loading dataset")
     data, labels, class_occurrences, vocabulary = await load_twitter_dataset()
     print("Dataset loaded")
-
-    # cnn((image[1]["0_0.jpg"][None,:,:,:])/255)
     token_manager = TokenManager()
     login(token_manager.get_access_token())
     vit_model, vit_processor = create_vit()
     vit = ViT(vit_model, vit_processor)
-    # cnn(torch.rand(3, 256, 256))
     print("Creating vit llama model")
     model, tokenizer = create_llama_model(model_name, create_default_quantization_config())
-    combined = CombinedModel(vit, create_roberta_base(), len(labels.keys()))
+    #model, tokenizer = create_roberta_base()
+    #combined = create_parameter_efficient_model(CombinedModel(vit, model, len(labels.keys())))
+    combined = CombinedModel(vit,model,len(labels.keys()))
     print("Training combined model")
-    combined = train.training_loop_combined(combined, data['train'], data["val"], tokenizer,class_occurrences, epochs=10)
-    #combined.text_model = merge_lora_layers_with_text_model(combined)
+    combined = train.training_loop_combined(combined, data['train'], data["val"], tokenizer,class_occurrences, epochs=3)
+    save_model(combined, "models/llama_vit_raw.pth")
     print("Saving model")
-    combined.save_pretrained("peft_finetuned_llama.pth")
-    MODEL_OUT_PATH = "./combined_model_roberta_vit.pth"
-    torch.save(combined.state_dict(), MODEL_OUT_PATH)
+    #save_lora_model(combined,"peft_models")
     print("Leaving")
+
 
 def create_random_tensors(dim: tuple) -> torch.Tensor:
     return torch.randint(low=0, high=3, size=dim, dtype=torch.int)

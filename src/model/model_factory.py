@@ -1,4 +1,4 @@
-from torch import float16
+from torch import float16, bfloat16
 from transformers import AutoTokenizer, LlamaModel, LlamaForCausalLM, LlamaForTokenClassification, \
     RobertaTokenizerFast, RobertaModel, ViTImageProcessor, ViTModel, MistralModel, LlamaTokenizer
 
@@ -29,7 +29,7 @@ def create_llama_model(model_name, bnb):
         model_name,
         device_map="auto",
         low_cpu_mem_usage=True,
-        torch_dtype=float16,
+        torch_dtype=bfloat16,
         quantization_config=bnb,
     )
     tokenizer = AutoTokenizer.from_pretrained(model_name, add_bos_token=True)
@@ -41,7 +41,7 @@ def create_mistral(model_name, bnb):
         model_name,
         device_map="auto",
         low_cpu_mem_usage=True,
-        torch_dtype=float16,
+        torch_dtype=bfloat16,
         quantization_config=bnb,
     )
     tokenizer = AutoTokenizer.from_pretrained(model_name, add_bos_token=True)

@@ -5,6 +5,10 @@ import torch
 from peft import PeftModel
 from sklearn.utils.class_weight import compute_class_weight
 
+from torch.optim import AdamW
+from torch.optim.lr_scheduler import LinearLR
+from transformers import get_linear_schedule_with_warmup
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def _compute_inverse_freq_weights(y, alpha=0.5) -> torch.Tensor:
@@ -27,14 +31,34 @@ def align_labels(word_ids, labels):
     return padded_labels
 
 def _create_optimizer(parameters: Iterable[torch.Tensor], learning_rate=1e-5, momentum=0.9) -> torch.optim.Optimizer:
-    return torch.optim.SGD(parameters, lr=learning_rate, momentum=momentum, weight_decay=0.01)
+    return torch.optim.SGD(parameters, lr=learning_rate, momentum=momentum)
 
 def _create_adamw_optimizer(parameters: Iterable[torch.Tensor], learning_rate=1e-5) -> torch.optim.AdamW:
-    return torch.optim.AdamW(parameters, lr=learning_rate)
+    return torch.optim.AdamW(parameters, lr=learning_rate,weight_decay=0.01)
 
 def _create_scheduler(optimizer, t_max) -> torch.optim.lr_scheduler.CosineAnnealingLR:
     return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=t_max, verbose=True)
 
+
+
+def setup_optimizer(model, t_max, lr=1e-5, weight_decay=0.1, warmup_steps=1000):
+    # Initialize AdamW optimizer
+    optimizer = AdamW(
+        model.parameters(),
+        lr=lr,  # Learning rate
+        betas=(0.9, 0.999),  # Beta parameters
+        eps=1e-8,  # Epsilon parameter
+        weight_decay=weight_decay
+    )
+
+    # Add linear warmup scheduler
+    scheduler = get_linear_schedule_with_warmup(
+        optimizer,
+        num_warmup_steps=warmup_steps,
+        num_training_steps=t_max
+    )
+
+    return optimizer, scheduler
 def training_loop_text_only(model: Union[torch.nn.Module, PeftModel], train_data, validation_data, tokenizer, epochs=10,
                             patience=3):
     model.to(device)
@@ -68,7 +92,7 @@ def perform_epoch_text_only(model, tokenizer, train_data, loss_criterion, optimi
         outputs = model(text)
         loss = loss_criterion(outputs.squeeze(0), aligned_labels)
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
         running_loss += loss.item()
 
         optimizer.step()
@@ -79,9 +103,9 @@ def training_loop_combined(model: Union[torch.nn.Module, PeftModel], train_data,
                            class_occurrences, epochs=10, patience=3):
     model.to(device)
     loss_criterion = _create_cross_entropy_loss_criterion(class_occurrences)
-    optimizer =_create_optimizer(model.parameters())
-    scheduler = _create_scheduler(optimizer, t_max=epochs * len(train_data))
-
+    #optimizer = _create_adamw_optimizer(model.parameters())
+    #scheduler = _create_scheduler(optimizer, t_max=epochs * len(train_data))
+    optimizer, scheduler = setup_optimizer(model, t_max=epochs*len(train_data))
     for epoch in range(epochs):
         training_loss = perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, scheduler)
         val_loss = validate_after_epoch(model, tokenizer, loss_criterion, validation_data)
@@ -105,15 +129,16 @@ def perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, sched
         text = {key: value.to(device) for key, value in text.items()}
         aligned_labels = torch.tensor(align_labels(word_ids, labels), device=device, dtype=torch.long)
 
-        optimizer.zero_grad()
         outputs = model(images, text)
         loss = loss_criterion(outputs.squeeze(0), aligned_labels)
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
         running_loss += loss.item()
 
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
         scheduler.step()
+        optimizer.zero_grad()
+
 
     return running_loss / len(train_data)
 

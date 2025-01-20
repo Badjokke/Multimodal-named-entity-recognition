@@ -29,3 +29,6 @@ def _create_lora_config() -> LoraConfig:
 
 def create_parameter_efficient_model(model) -> PeftModel:
     return get_peft_model(model, _create_lora_config())
+
+def peft_from_pretrained(model, path) -> PeftModel:
+    return PeftModel.from_pretrained(model, path)

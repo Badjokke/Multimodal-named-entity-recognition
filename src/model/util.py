@@ -1,10 +1,23 @@
 import torch
 import re
+import os
+from model.configuration.quantization import peft_from_pretrained
 
 
 def save_model(model:torch.nn.Module, model_path: str):
     torch.save(model.state_dict(), model_path)
 
+
+def load_lora_model(model, path:str):
+    model.load_state_dict(load_and_filter_state_dict(os.path.join(path, "model.pt")))
+    if os.path.exists(os.path.join(path, "adapter_config.json")):
+        model = peft_from_pretrained(model, path)
+    return model
+
+def save_lora_model(model:torch.nn.Module, path:str):
+    os.makedirs(path, exist_ok=True)
+    torch.save(model.state_dict(), os.path.join(path, "model.pt"))
+    model.save_pretrained(path)
 
 def load_and_filter_state_dict(model_path:str)->dict:
     state_dict = torch.load("./combined_model_e1.pth", weights_only=True)
@@ -64,3 +77,8 @@ def answer_to_labels(text:str, labels:dict):
             print(f"Prediction {token_prediction} in answer {answer} not in valid format.")
             token_prediction.append("O")
         y_pred.append(labels[token_prediction[1].strip()[1:-1]])
+
+def freeze_model(model):
+    for param in model.parameters():
+        param.requires_grad = False
+    return model
