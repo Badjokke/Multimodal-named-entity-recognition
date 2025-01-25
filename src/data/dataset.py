@@ -92,21 +92,18 @@ def _prepare_twitter_dataset_for_training(text_set: dict[str, list[dict[str, lis
                                           image_set: dict[str, torch.Tensor],
                                           text_processor=Union[list[DataProcessor], None],
                                           image_processor=Union[list[DataProcessor], None]) -> tuple[
-    dict[str, list], dict[str, int], list[int], dict[str, str]]:
+    dict[str, list], dict[str, int], list[int], set[str]]:
     final_dataset = {}
     labels = {}
     class_occurrences = []
-    vocabulary = {}
-    word_id = 0
+    vocabulary = set()
     for key in text_set:
         jsonl_file = text_set[key]
         final_dataset[key] = _process_dataset_part(jsonl_file, labels, text_processor, image_processor, image_set)
         for tpl in final_dataset[key]:
             words, images, lbls = tpl
             for word in words:
-                if word not in vocabulary:
-                    vocabulary[word] = word_id
-                    word_id += 1
+                vocabulary.add(word)
             for lbl in lbls:
                 class_occurrences.append(lbl)
 
@@ -138,13 +135,13 @@ def _process_labels(sentence_labels: list[str], labels: dict[str, int]) -> list[
 
 
 def _process_image_refs(image_set: dict[str, torch.Tensor], image_refs: list[str],
-                        image_data_processor: list[DataProcessor], return_first=True) -> torch.Tensor:
+                        image_data_processor: list[DataProcessor], return_first=False) -> torch.Tensor:
     if return_first:
         return image_set[image_refs[0]] if image_data_processor is None else [
             _apply_data_processor(image_set[image_refs[0]], image_data_processor)]
-    return list(
+    return torch.stack(list(
         map(lambda ref: image_set[ref], image_refs)) if image_data_processor is None else _map_with_data_processor(
-        image_refs, image_data_processor)
+        image_refs, image_data_processor))
 
 
 def _map_with_data_processor(items: list[Union[str, torch.Tensor]], data_processors: list[DataProcessor]):

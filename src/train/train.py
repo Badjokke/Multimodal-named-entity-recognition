@@ -4,9 +4,8 @@ import numpy as np
 import torch
 from peft import PeftModel
 from sklearn.utils.class_weight import compute_class_weight
-
+from metrics.metrics import  Metrics
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import LinearLR
 from transformers import get_linear_schedule_with_warmup
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -20,9 +19,7 @@ def _compute_class_weights_rare_events(y) -> torch.Tensor:
     return torch.from_numpy(weights).to(torch.float32).to(device)
 
 def _create_cross_entropy_loss_criterion(y) -> torch.nn.CrossEntropyLoss:
-    weights = compute_class_weight(class_weight="balanced", classes=np.unique(y), y=y)
-    w = torch.from_numpy(weights).to(torch.float32).to(device)
-    return torch.nn.CrossEntropyLoss(ignore_index=-100, weight=w)
+    return torch.nn.CrossEntropyLoss(ignore_index=-100)
 
 def align_labels(word_ids, labels):
     padded_labels = []
@@ -34,31 +31,11 @@ def _create_optimizer(parameters: Iterable[torch.Tensor], learning_rate=1e-5, mo
     return torch.optim.SGD(parameters, lr=learning_rate, momentum=momentum)
 
 def _create_adamw_optimizer(parameters: Iterable[torch.Tensor], learning_rate=1e-5) -> torch.optim.AdamW:
-    return torch.optim.AdamW(parameters, lr=learning_rate,weight_decay=0.01)
+    return torch.optim.AdamW(parameters, lr=learning_rate, weight_decay=0.01)
 
 def _create_scheduler(optimizer, t_max) -> torch.optim.lr_scheduler.CosineAnnealingLR:
     return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=t_max, verbose=True)
 
-
-
-def setup_optimizer(model, t_max, lr=1e-5, weight_decay=0.1, warmup_steps=1000):
-    # Initialize AdamW optimizer
-    optimizer = AdamW(
-        model.parameters(),
-        lr=lr,  # Learning rate
-        betas=(0.9, 0.999),  # Beta parameters
-        eps=1e-8,  # Epsilon parameter
-        weight_decay=weight_decay
-    )
-
-    # Add linear warmup scheduler
-    scheduler = get_linear_schedule_with_warmup(
-        optimizer,
-        num_warmup_steps=warmup_steps,
-        num_training_steps=t_max
-    )
-
-    return optimizer, scheduler
 def training_loop_text_only(model: Union[torch.nn.Module, PeftModel], train_data, validation_data, tokenizer, epochs=10,
                             patience=3):
     model.to(device)
@@ -99,58 +76,21 @@ def perform_epoch_text_only(model, tokenizer, train_data, loss_criterion, optimi
 
     return running_loss
 
-
-def training_loop_combined_lstm(model: Union[torch.nn.Module, PeftModel], train_data, validation_data, vocabulary,
-                                class_occurrences, epochs=10, patience=3):
+def training_loop_combined(model: Union[torch.nn.Module, PeftModel], train_data, validation_data, test_data, tokenizer,
+                           class_occurrences, epochs=10, patience=3):
     model.to(device)
     loss_criterion = _create_cross_entropy_loss_criterion(class_occurrences)
     optimizer = _create_adamw_optimizer(model.parameters())
     scheduler = _create_scheduler(optimizer, t_max=epochs * len(train_data))
-
-    for epoch in range(epochs):
-        training_loss = perform_epoch_combined_lstm(model, vocabulary, train_data, loss_criterion, optimizer, scheduler)
-        val_loss = validate_after_epoch(model, vocabulary, loss_criterion, validation_data)
-        print(f"[epoch: {epoch + 1}] Training loss: {training_loss}")
-        print(f"[epoch: {epoch + 1}] Validation loss: {val_loss}")
-
-def perform_epoch_combined_lstm(model, vocabulary, train_data, loss_criterion, optimizer, scheduler):
-    model.train()
-    for i in range(len(train_data)):
-        text, images, labels = torch.tensor(list(map(lambda word: vocabulary[word],train_data[i][0])), dtype=torch.long),train_data[i][1].to(device), torch.tensor(train_data[i][2], dtype=torch.long, device=device)
-        outputs = model(images, text)
-        loss = loss_criterion(outputs.squeeze(0), labels)
-        optimizer.zero_grad()
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=40.0)
-        optimizer.step()
-        scheduler.step()
-
-def perform_validation_combined_lstm(model, vocabulary, loss_criterion, validation_data):
-    model.eval()
-    loss = 0.
-    y_true, y_pred = [], []
-    with torch.no_grad():
-        for i in range(len(validation_data)):
-            data_sample = validation_data[i]
-            text, images, labels = torch.Tensor(list(map(lambda word: vocabulary[word], data_sample[0])),device=device),torch.tensor(data_sample[2],dtype=torch.long, device=device) ,data_sample[1].to(device)
-            outputs = model(images, text)
-            loss += loss_criterion(outputs.squeeze(0), labels)
-            y_true.append(labels)
-            y_pred.append(torch.argmax(outputs.squeeze(0), dim=1))
-    return loss / len(validation_data)
-
-def training_loop_combined(model: Union[torch.nn.Module, PeftModel], train_data, validation_data, tokenizer,
-                           class_occurrences, epochs=10, patience=3):
-    model.to(device)
-    loss_criterion = _create_cross_entropy_loss_criterion(class_occurrences)
-    #optimizer = _create_adamw_optimizer(model.parameters())
-    #scheduler = _create_scheduler(optimizer, t_max=epochs * len(train_data))
-    optimizer, scheduler = setup_optimizer(model, t_max=epochs*len(train_data))
+    #optimizer, scheduler = setup_optimizer(model, t_max=epochs*len(train_data))
     for epoch in range(epochs):
         training_loss = perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, scheduler)
         val_loss = validate_after_epoch(model, tokenizer, loss_criterion, validation_data)
-        print(f"[epoch: {epoch + 1}] Training loss: {training_loss}")
-        print(f"[epoch: {epoch + 1}] Validation loss: {val_loss}")
+        print(f"[epoch: {epoch + 1}] Training loss: {training_loss[0]}. Training macro f1: {training_loss[1]}")
+        print(f"[epoch: {epoch + 1}] Validation loss: {val_loss[0]}. Validation macro f1: {val_loss[1]}")
+    test_results = validate_after_epoch(model, tokenizer, loss_criterion, test_data)
+    print(f"Test loss: {test_results[0]}. Test macro f1: {test_results[1]}")
+
     return model
 
 def early_stop():
@@ -159,6 +99,8 @@ def early_stop():
 def perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, scheduler):
     model.train()
     running_loss = 0.0
+    y_pred = []
+    y_true = []
     for i in range(len(train_data)):
         data_sample = train_data[i]
         images, labels, text = data_sample[1].to(device), torch.tensor(data_sample[2], dtype=torch.long,
@@ -169,21 +111,28 @@ def perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, sched
         text = {key: value.to(device) for key, value in text.items()}
         aligned_labels = torch.tensor(align_labels(word_ids, labels), device=device, dtype=torch.long)
 
-        outputs = model(images, text)
-        loss = loss_criterion(outputs.squeeze(0), aligned_labels)
-        running_loss += loss.item()
-
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-        optimizer.step()
-        scheduler.step()
         optimizer.zero_grad()
 
+        outputs = model(images, text)
+        aligned_labels = aligned_labels.unsqueeze(0).repeat(outputs.size(0),1)
+        loss = loss_criterion(outputs.permute(0,2,1), aligned_labels)
+        running_loss += loss.item()
+        #y_pred.append(decode_labels_majority_vote(word_ids[1:], torch.argmax(outputs.squeeze(0),dim=1)[1:]))
+        #y_true.append(labels)
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
+        optimizer.step()
+        scheduler.step()
 
-    return running_loss / len(train_data)
+        y_pred.append((torch.argmax(outputs, dim=2)[0:,1:]).tolist())
+        y_true.append((aligned_labels[0:, 1:]).tolist())
+
+    metrics = Metrics(y_pred, y_true, 9, {_:str(_) for _ in range(9)})
+    macro_f1 = metrics.macro_f1(metrics.confusion_matrix())
+    return running_loss / len(train_data), macro_f1
 
 def validate_after_epoch(model, tokenizer, loss_criterion, validation_data) -> tuple[
-    float, tuple[list[torch.Tensor], list[torch.Tensor]]]:
+    float, float]:
     model.eval()
     loss = 0.
     y_true, y_pred = [], []
@@ -194,14 +143,22 @@ def validate_after_epoch(model, tokenizer, loss_criterion, validation_data) -> t
                                                                            device=device), tokenizer(data_sample[0],
                                                                                                      return_tensors="pt",
                                                                                                      is_split_into_words=True)
-            labels = torch.tensor(align_labels(text.word_ids(), labels), device=device)
+            word_ids = text.word_ids()
+            aligned_labels = torch.tensor(align_labels(word_ids, labels), device=device)
             text = {key: value.to(device) for key, value in text.items()}
 
-            outputs = model(images, text).squeeze(0)
-            loss += loss_criterion(outputs, labels)
-            y_true.append(labels)
-            y_pred.append(torch.argmax(outputs, dim=1))
-    return loss / len(validation_data) #(y_true, y_pred)
+            outputs = model(images, text)
+            aligned_labels = aligned_labels.unsqueeze(0).repeat(outputs.size(0), 1)
+
+            loss = loss_criterion(outputs.permute(0, 2, 1), aligned_labels)
+            #y_pred.append(decode_labels_majority_vote(word_ids[1:], torch.argmax(outputs.squeeze(0), dim=1)[1:]))
+            y_pred.append((torch.argmax(outputs, dim=2)[0:, 1:]).tolist())
+            y_true.append((aligned_labels[0:, 1:]).tolist())
+
+    metrics = Metrics(y_pred, y_true, 9, {_: str(_) for _ in range(9)})
+    macro_f1 = metrics.macro_f1(metrics.confusion_matrix())
+    return loss / len(validation_data),macro_f1 #(y_true, y_pred)
+
 
 def get_occurrence_count(l: list):
     dic = dict()
@@ -211,7 +168,7 @@ def get_occurrence_count(l: list):
         dic[n] += 1
     return dic
 
-def get_index_of_max_value(dic: dict[int, int]):
+def get_max_value(dic: dict[int, int]):
     v = 0
     i = 0
     for (key, value) in dic.items():
@@ -220,18 +177,18 @@ def get_index_of_max_value(dic: dict[int, int]):
             i = key
     return i
 
-def decode_labels_majority_vote(word_ids, y_predicted):
+def decode_labels_majority_vote(word_ids, y_pred):
+    y_predicted = y_pred.tolist()
     decoded_labels = []
     walker = 0
-    while walker < len(word_ids) - 1:
+    n = len(word_ids)
+    while walker < n:
         current_w_id = word_ids[walker]
-        if current_w_id == -100:
-            continue
         start_index = walker
-        while word_ids[walker + 1] == current_w_id:
+        while walker+1 < n and word_ids[walker + 1] == current_w_id:
             walker += 1
         walker += 1
-        decoded_labels.append(get_index_of_max_value(get_occurrence_count(y_predicted[start_index:walker])))
+        decoded_labels.append(get_max_value(get_occurrence_count(y_predicted[start_index:walker])))
     return torch.tensor(decoded_labels, dtype=torch.long, device=device)
 
 def inference_loop_combined_model(model: torch.nn.Module, test_data, tokenizer):

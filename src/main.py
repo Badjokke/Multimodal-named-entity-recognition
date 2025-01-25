@@ -95,20 +95,24 @@ async def llama_vit_multimodal():
     print("Loading dataset")
     data, labels, class_occurrences, vocabulary = await load_twitter_dataset()
     print("Dataset loaded")
+
     token_manager = TokenManager()
     login(token_manager.get_access_token())
+
     vit_model, vit_processor = create_vit()
     vit = ViT(vit_model, vit_processor)
     print("Creating vit llama model")
     model, tokenizer = create_llama_model(model_name, create_default_quantization_config())
-    #model, tokenizer = create_roberta_base()
-    #combined = create_parameter_efficient_model(CombinedModel(vit, model, len(labels.keys())))
-    combined = CombinedModel(vit,model,len(labels.keys()))
+    combined = CombinedModel(vit, create_parameter_efficient_model(model), len(labels.keys()))
+
     print("Training combined model")
-    combined = train.training_loop_combined(combined, data['train'], data["val"], tokenizer,class_occurrences, epochs=3)
-    save_model(combined, "models/llama_vit_raw.pth")
+    combined = train.training_loop_combined(combined, data['train'], data["val"], data["test"], tokenizer,
+                                            class_occurrences, epochs=5)
+    torch.save(combined.state_dict(), "models/llama_vit.pth")
+    # save_model(combined, "models/llama_vit_raw.pth")
+    # combined.text_model = combined.text_model.merge_and_unload()
     print("Saving model")
-    #save_lora_model(combined,"peft_models")
+    # save_lora_model(combined,"peft_models")
     print("Leaving")
 
 

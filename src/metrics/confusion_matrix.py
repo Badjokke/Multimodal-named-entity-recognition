@@ -19,10 +19,11 @@ class ConfusionMatrix:
 
     def create(self) -> list[list[int]]:
         for i in range(len(self.y_true)):
-            for j in range(len(self.y_true[i])):
-                true_label = self.y_true[i][j]
-                pred_label = self.y_pred[i][j]
-                self.matrix[true_label][pred_label] += 1
+            for batch in range(len(self.y_true[i])):
+                for j in range(len(self.y_true[i][batch])):
+                    true_label = self.y_true[i][batch][j]
+                    pred_label = self.y_pred[i][batch][j]
+                    self.matrix[true_label][pred_label] += 1
         return self.matrix.copy()
 
 
