@@ -19,7 +19,7 @@ def _compute_class_weights_rare_events(y) -> torch.Tensor:
     return torch.from_numpy(weights).to(torch.float32).to(device)
 
 def _create_cross_entropy_loss_criterion(y) -> torch.nn.CrossEntropyLoss:
-    return torch.nn.CrossEntropyLoss(ignore_index=-100)
+    return torch.nn.CrossEntropyLoss(ignore_index=-100, weight=_compute_class_weights_rare_events(y))
 
 def align_labels(word_ids, labels):
     padded_labels = []
@@ -30,7 +30,7 @@ def align_labels(word_ids, labels):
 def _create_optimizer(parameters: Iterable[torch.Tensor], learning_rate=1e-5, momentum=0.9) -> torch.optim.Optimizer:
     return torch.optim.SGD(parameters, lr=learning_rate, momentum=momentum)
 
-def _create_adamw_optimizer(parameters: Iterable[torch.Tensor], learning_rate=1e-5) -> torch.optim.AdamW:
+def _create_adamw_optimizer(parameters: Iterable[torch.Tensor], learning_rate=1e-7) -> torch.optim.AdamW:
     return torch.optim.AdamW(parameters, lr=learning_rate, weight_decay=0.01)
 
 def _create_scheduler(optimizer, t_max) -> torch.optim.lr_scheduler.CosineAnnealingLR:
@@ -108,14 +108,15 @@ def perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, sched
                                                                                                  return_tensors="pt",
                                                                                                  is_split_into_words=True)
         word_ids = text.word_ids()
-        text = {key: value.to(device) for key, value in text.items()}
+        text = {key: value[0:,1:].to(device) for key, value in text.items()}
         aligned_labels = torch.tensor(align_labels(word_ids, labels), device=device, dtype=torch.long)
 
         optimizer.zero_grad()
 
-        outputs = model(images, text)
-        aligned_labels = aligned_labels.unsqueeze(0).repeat(outputs.size(0),1)
-        loss = loss_criterion(outputs.permute(0,2,1), aligned_labels)
+        aligned_labels = aligned_labels.unsqueeze(0).repeat(images.size(0),1)[0:,1:]
+        outputs, loss = model(images, text, aligned_labels)
+
+        #loss = loss_criterion(outputs.permute(0,2,1), aligned_labels)
         running_loss += loss.item()
         #y_pred.append(decode_labels_majority_vote(word_ids[1:], torch.argmax(outputs.squeeze(0),dim=1)[1:]))
         #y_true.append(labels)
@@ -124,8 +125,10 @@ def perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, sched
         optimizer.step()
         scheduler.step()
 
-        y_pred.append((torch.argmax(outputs, dim=2)[0:,1:]).tolist())
-        y_true.append((aligned_labels[0:, 1:]).tolist())
+        y_pred.append(outputs)
+        y_true.append(aligned_labels.tolist())
+        #y_pred.append(decode_labels_majority_vote(word_ids, torch.argmax(outputs, dim=2)[0:, 1:]).tolist())
+        #y_true.append(((labels.unsqueeze(0).repeat(outputs.size(0), 1))[0:, 1:]).tolist())
 
     metrics = Metrics(y_pred, y_true, 9, {_:str(_) for _ in range(9)})
     macro_f1 = metrics.macro_f1(metrics.confusion_matrix())
@@ -144,16 +147,18 @@ def validate_after_epoch(model, tokenizer, loss_criterion, validation_data) -> t
                                                                                                      return_tensors="pt",
                                                                                                      is_split_into_words=True)
             word_ids = text.word_ids()
-            aligned_labels = torch.tensor(align_labels(word_ids, labels), device=device)
-            text = {key: value.to(device) for key, value in text.items()}
+            aligned_labels = aligned_labels.unsqueeze(0).repeat(images.size(0), 1)[0:, 1:]
 
-            outputs = model(images, text)
-            aligned_labels = aligned_labels.unsqueeze(0).repeat(outputs.size(0), 1)
+            text = {key: value[0:, 1:].to(device) for key, value in text.items()}
 
-            loss = loss_criterion(outputs.permute(0, 2, 1), aligned_labels)
+            outputs, loss = model(images, text, aligned_labels)
+            y_pred.append(outputs)
+            y_true.append(aligned_labels.tolist())
+            #aligned_labels = aligned_labels.unsqueeze(0).repeat(outputs.size(0), 1)
+            #loss = loss_criterion(outputs.permute(0, 2, 1), aligned_labels)
             #y_pred.append(decode_labels_majority_vote(word_ids[1:], torch.argmax(outputs.squeeze(0), dim=1)[1:]))
-            y_pred.append((torch.argmax(outputs, dim=2)[0:, 1:]).tolist())
-            y_true.append((aligned_labels[0:, 1:]).tolist())
+            #y_pred.append(decode_labels_majority_vote(word_ids,torch.argmax(outputs, dim=2)[0:, 1:]).tolist())
+            #y_true.append(((labels.unsqueeze(0).repeat(outputs.size(0), 1))[0:, 1:]).tolist())
 
     metrics = Metrics(y_pred, y_true, 9, {_: str(_) for _ in range(9)})
     macro_f1 = metrics.macro_f1(metrics.confusion_matrix())
@@ -177,19 +182,26 @@ def get_max_value(dic: dict[int, int]):
             i = key
     return i
 
+def most_common(lst):
+    return max(set(lst), key=lst.count)
+
 def decode_labels_majority_vote(word_ids, y_pred):
     y_predicted = y_pred.tolist()
-    decoded_labels = []
-    walker = 0
-    n = len(word_ids)
-    while walker < n:
-        current_w_id = word_ids[walker]
-        start_index = walker
-        while walker+1 < n and word_ids[walker + 1] == current_w_id:
-            walker += 1
-        walker += 1
-        decoded_labels.append(get_max_value(get_occurrence_count(y_predicted[start_index:walker])))
-    return torch.tensor(decoded_labels, dtype=torch.long, device=device)
+    batched_decoded_labels = []
+    for batch in range(len(y_predicted)):
+        current_word_labels = []
+        decoded_labels = []
+        current_word_id = word_ids[0]
+        for i in range(len(y_predicted[batch])):
+            w_id = word_ids[i]
+            if current_word_id != w_id:
+                decoded_labels.append(most_common(current_word_labels))
+                current_word_labels = []
+                current_word_id = w_id
+            current_word_labels.append(y_predicted[batch][i])
+        decoded_labels.append(most_common(current_word_labels))
+        batched_decoded_labels.append(torch.tensor(decoded_labels, dtype=torch.long,device=device))
+    return torch.stack(batched_decoded_labels)
 
 def inference_loop_combined_model(model: torch.nn.Module, test_data, tokenizer):
     model.to(device)
