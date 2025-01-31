@@ -28,4 +28,4 @@ class ConfusionMatrix:
 
 
     def get_matrix(self) -> list[list[int]]:
-        return self.matrix.copy()
+        return self.matrix#.copy()

@@ -5,8 +5,6 @@ import torch
 from peft import PeftModel
 from sklearn.utils.class_weight import compute_class_weight
 from metrics.metrics import  Metrics
-from torch.optim import AdamW
-from transformers import get_linear_schedule_with_warmup
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -30,7 +28,7 @@ def align_labels(word_ids, labels):
 def _create_optimizer(parameters: Iterable[torch.Tensor], learning_rate=1e-5, momentum=0.9) -> torch.optim.Optimizer:
     return torch.optim.SGD(parameters, lr=learning_rate, momentum=momentum)
 
-def _create_adamw_optimizer(parameters: Iterable[torch.Tensor], learning_rate=1e-7) -> torch.optim.AdamW:
+def _create_adamw_optimizer(parameters: Iterable[torch.Tensor], learning_rate=2e-5) -> torch.optim.AdamW:
     return torch.optim.AdamW(parameters, lr=learning_rate, weight_decay=0.01)
 
 def _create_scheduler(optimizer, t_max) -> torch.optim.lr_scheduler.CosineAnnealingLR:
@@ -47,34 +45,38 @@ def training_loop_text_only(model: Union[torch.nn.Module, PeftModel], train_data
     mean_loss = 0
 
     for epoch in range(epochs):
-        loss = perform_epoch_text_only(model, tokenizer, train_data, loss_criterion, optimizer)
+        loss, f1 = perform_epoch_text_only(model, tokenizer, train_data, loss_criterion, optimizer)
         loss = loss / len(train_data)
         print(f"[epoch: {epoch + 1}] Training loss: {loss}")
         mean_loss += loss
     print(f"Average loss: {mean_loss / epochs}")
     return model
 
-def perform_epoch_text_only(model, tokenizer, train_data, loss_criterion, optimizer):
+def perform_epoch_text_only(model, tokenizer, train_data, loss_criterion, optimizer, scheduler):
     running_loss = 0.0
+    y_pred, y_true = [], []
     for i in range(len(train_data)):
         data_sample = train_data[i]
-        text, labels = tokenizer(data_sample[0], return_tensors="pt", padding=True, truncation=True,
-                                 is_split_into_words=True), data_sample[1].to(device)
+        text, labels = tokenizer(data_sample[0], return_tensors="pt", is_split_into_words=True), data_sample[1].to(device)
         word_ids = text.word_ids()
         text = {key: value.to(device) for key, value in text.items()}
-        aligned_labels = torch.tensor(align_labels(word_ids, labels), device=device, dtype=torch.long)
+        aligned_labels = torch.tensor(align_labels(word_ids, labels), device=device, dtype=torch.long).unsqueeze(0)
 
         optimizer.zero_grad()
 
-        outputs = model(text)
-        loss = loss_criterion(outputs.squeeze(0), aligned_labels)
+        outputs, loss = model(text,aligned_labels)
+        #loss = loss_criterion(outputs.squeeze(0), aligned_labels)
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
         running_loss += loss.item()
 
         optimizer.step()
+        #scheduler.step()
+        y_pred.append(decode_labels_majority_vote(word_ids[1:], torch.argmax(outputs, dim=2)[0:, 1:]).tolist())
+        y_true.append((labels.unsqueeze(0).repeat(outputs.size(0), 1)).tolist())
 
-    return running_loss
+    metrics = Metrics(y_pred, y_true, 9, {_: str(_) for _ in range(9)})
+    macro_f1 = metrics.macro_f1(metrics.confusion_matrix())
+    return running_loss / len(train_data), macro_f1
 
 def training_loop_combined(model: Union[torch.nn.Module, PeftModel], train_data, validation_data, test_data, tokenizer,
                            class_occurrences, epochs=10, patience=3):
@@ -86,11 +88,10 @@ def training_loop_combined(model: Union[torch.nn.Module, PeftModel], train_data,
     for epoch in range(epochs):
         training_loss = perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, scheduler)
         val_loss = validate_after_epoch(model, tokenizer, loss_criterion, validation_data)
-        print(f"[epoch: {epoch + 1}] Training loss: {training_loss[0]}. Training macro f1: {training_loss[1]}")
-        print(f"[epoch: {epoch + 1}] Validation loss: {val_loss[0]}. Validation macro f1: {val_loss[1]}")
-    test_results = validate_after_epoch(model, tokenizer, loss_criterion, test_data)
-    print(f"Test loss: {test_results[0]}. Test macro f1: {test_results[1]}")
-
+        test_results = validate_after_epoch(model, tokenizer, loss_criterion, test_data)
+        print(f"[epoch: {epoch + 1}] Training loss: {training_loss[0]}. Training macro f1: {training_loss[1]['macro']}; micro f1: {training_loss[1]['micro']}, acc: {training_loss[1]['accuracy']}")
+        print(f"[epoch: {epoch + 1}] Validation loss: {val_loss[0]}. Validation macro f1: {val_loss[1]['macro']}; micro f1: {val_loss[1]['micro']}, acc: {val_loss[1]['accuracy']}")
+        print(f"[epoch: {epoch + 1}] Test loss: {test_results[0]}. Test macro f1: {test_results[1]['macro']}; micro f1: {test_results[1]['micro']}, acc: {test_results[1]['accuracy']}")
     return model
 
 def early_stop():
@@ -108,34 +109,34 @@ def perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, sched
                                                                                                  return_tensors="pt",
                                                                                                  is_split_into_words=True)
         word_ids = text.word_ids()
-        text = {key: value[0:,1:].to(device) for key, value in text.items()}
-        aligned_labels = torch.tensor(align_labels(word_ids, labels), device=device, dtype=torch.long)
+        text = {key: value.to(device) for key, value in text.items()}
 
         optimizer.zero_grad()
 
-        aligned_labels = aligned_labels.unsqueeze(0).repeat(images.size(0),1)[0:,1:]
-        outputs, loss = model(images, text, aligned_labels)
+        aligned_labels = torch.tensor(align_labels(word_ids, labels), device=device, dtype=torch.long).unsqueeze(0).repeat(images.size(0),1)
+        #aligned_labels = torch.tensor(align_labels(word_ids, labels), device=device, dtype=torch.long).unsqueeze(0)
+        outputs = model(images, text)
 
-        #loss = loss_criterion(outputs.permute(0,2,1), aligned_labels)
+        loss = loss_criterion(outputs.permute(0,2,1), aligned_labels)
         running_loss += loss.item()
         #y_pred.append(decode_labels_majority_vote(word_ids[1:], torch.argmax(outputs.squeeze(0),dim=1)[1:]))
         #y_true.append(labels)
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
+        #torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
         optimizer.step()
         scheduler.step()
 
-        y_pred.append(outputs)
-        y_true.append(aligned_labels.tolist())
-        #y_pred.append(decode_labels_majority_vote(word_ids, torch.argmax(outputs, dim=2)[0:, 1:]).tolist())
-        #y_true.append(((labels.unsqueeze(0).repeat(outputs.size(0), 1))[0:, 1:]).tolist())
+        y_pred.append(torch.argmax(outputs, dim=-1)[0:, 1:].tolist())
+        y_true.append(aligned_labels[0:, 1:].tolist())
 
     metrics = Metrics(y_pred, y_true, 9, {_:str(_) for _ in range(9)})
     macro_f1 = metrics.macro_f1(metrics.confusion_matrix())
-    return running_loss / len(train_data), macro_f1
+    micro_f1 = metrics.micro_f1(metrics.confusion_matrix())
+    acc = metrics.accuracy()
+    return running_loss / len(train_data), {"macro": macro_f1, "micro": micro_f1, "accuracy": acc}
 
 def validate_after_epoch(model, tokenizer, loss_criterion, validation_data) -> tuple[
-    float, float]:
+    float, dict[str,float]]:
     model.eval()
     loss = 0.
     y_true, y_pred = [], []
@@ -147,40 +148,24 @@ def validate_after_epoch(model, tokenizer, loss_criterion, validation_data) -> t
                                                                                                      return_tensors="pt",
                                                                                                      is_split_into_words=True)
             word_ids = text.word_ids()
-            aligned_labels = aligned_labels.unsqueeze(0).repeat(images.size(0), 1)[0:, 1:]
 
-            text = {key: value[0:, 1:].to(device) for key, value in text.items()}
+            aligned_labels = torch.tensor(align_labels(word_ids, labels), device=device, dtype=torch.long).unsqueeze(0).repeat(images.size(0),1)
+            text = {key: value.to(device) for key, value in text.items()}
 
-            outputs, loss = model(images, text, aligned_labels)
-            y_pred.append(outputs)
-            y_true.append(aligned_labels.tolist())
-            #aligned_labels = aligned_labels.unsqueeze(0).repeat(outputs.size(0), 1)
-            #loss = loss_criterion(outputs.permute(0, 2, 1), aligned_labels)
+            outputs = model(images, text)
+            loss += loss_criterion(outputs.permute(0, 2, 1), aligned_labels)
             #y_pred.append(decode_labels_majority_vote(word_ids[1:], torch.argmax(outputs.squeeze(0), dim=1)[1:]))
-            #y_pred.append(decode_labels_majority_vote(word_ids,torch.argmax(outputs, dim=2)[0:, 1:]).tolist())
-            #y_true.append(((labels.unsqueeze(0).repeat(outputs.size(0), 1))[0:, 1:]).tolist())
+            y_pred.append(torch.argmax(outputs, dim=-1)[0:, 1:].tolist())
+            y_true.append(aligned_labels[0:, 1:].tolist())
+            #y_pred.append(decode_labels_majority_vote(word_ids[1:], torch.argmax(outputs, dim=2)[0:, 1:]).tolist())
+            #y_true.append((labels.unsqueeze(0).repeat(outputs.size(0), 1)).tolist())
 
     metrics = Metrics(y_pred, y_true, 9, {_: str(_) for _ in range(9)})
     macro_f1 = metrics.macro_f1(metrics.confusion_matrix())
-    return loss / len(validation_data),macro_f1 #(y_true, y_pred)
+    micro_f1 = metrics.micro_f1(metrics.confusion_matrix())
+    acc = metrics.accuracy()
+    return loss / len(validation_data), {"macro": macro_f1, "micro": micro_f1, "accuracy": acc} #(y_true, y_pred)
 
-
-def get_occurrence_count(l: list):
-    dic = dict()
-    for n in l:
-        if n not in dic:
-            dic[n] = 0
-        dic[n] += 1
-    return dic
-
-def get_max_value(dic: dict[int, int]):
-    v = 0
-    i = 0
-    for (key, value) in dic.items():
-        if value > v:
-            v = value
-            i = key
-    return i
 
 def most_common(lst):
     return max(set(lst), key=lst.count)
@@ -194,6 +179,8 @@ def decode_labels_majority_vote(word_ids, y_pred):
         current_word_id = word_ids[0]
         for i in range(len(y_predicted[batch])):
             w_id = word_ids[i]
+            if w_id is None:
+                continue
             if current_word_id != w_id:
                 decoded_labels.append(most_common(current_word_labels))
                 current_word_labels = []

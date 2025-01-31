@@ -1,4 +1,4 @@
-from torch import float16, bfloat16
+from torch import float16, bfloat16,float32
 from transformers import AutoTokenizer, LlamaModel, LlamaForCausalLM, LlamaForTokenClassification, \
     RobertaTokenizerFast, RobertaModel, ViTImageProcessor, ViTModel, MistralModel, LlamaTokenizer
 
@@ -6,7 +6,6 @@ from model.visual.convolutional_net import ConvNet
 from model.language.lstm import LSTM
 from model.configuration.quantization import create_parameter_efficient_model
 from model.language.transformer_classifier import TransformerClassifier
-
 def create_vit():
     model_name = "google/vit-base-patch16-224-in21k"
     processor = ViTImageProcessor.from_pretrained(model_name)
@@ -29,8 +28,8 @@ def create_llama_model(model_name, bnb):
         model_name,
         device_map="auto",
         low_cpu_mem_usage=True,
-        torch_dtype=bfloat16,
-        quantization_config=bnb,
+        torch_dtype=float32,
+        quantization_config=bnb
     )
     tokenizer = AutoTokenizer.from_pretrained(model_name, add_bos_token=True)
     tokenizer.pad_token = tokenizer.eos_token

@@ -14,12 +14,14 @@ from metrics.plots import SimplePlot
 from model.configuration.quantization import create_default_quantization_config, create_parameter_efficient_model
 from model.model_factory import (create_llama_model, create_roberta_base, create_vit, create_token_classification_llama, create_lstm)
 from model.multimodal.text_image_model import CombinedModel
-from model.util import load_and_filter_state_dict, save_model, create_message
+from model.language.transformer import BertCRF
+from model.util import load_and_filter_state_dict,save_model, create_message, freeze_model, load_lora_model, save_lora_model
 from model.visual.convolutional_net import ConvNet
 from model.visual.vit_wrapper import ViT
 from security.token_manager import TokenManager
 from train import train
-from train.train import training_loop_combined,training_loop_combined_lstm
+from train.train import training_loop_combined, training_loop_text_only
+
 
 async def inference(model_path):
     model_name = "meta-llama/Llama-3.1-8B"
@@ -76,19 +78,33 @@ async def create_roberta_multimodal():
     model, tokenizer = create_roberta_base()
     cnn = ConvNet()
     combined = CombinedModel(cnn, model, len(labels.keys()))
-    training_loop_combined(combined, data["train"], data["val"], tokenizer)
+    training_loop_combined(combined, data["train"], data["val"],data["test"], tokenizer)
 
 def merge_lora_layers_with_text_model(combined_model: CombinedModel) -> torch.nn.Module:
     return combined_model.text_model.merge_and_unload()
 
 async def create_vit_lstm_model():
     data, labels, class_occurrences, vocabulary = await load_twitter_dataset(text_processors=[StemmingTextDataProcessor()])
-    lstm = create_lstm(len(vocabulary.keys()))
+    lstm = create_lstm(len(vocabulary))
     vit, processor = create_vit()
     vit = ViT(vit, processor)
     combined = CombinedModel(vit, lstm, len(labels.keys()))
-    combined = training_loop_combined_lstm(combined, data["train"], data["val"], vocabulary, class_occurrences, epochs=10)
+    combined = training_loop_combined(combined, data["train"], data["val"], data["test"], class_occurrences, epochs=20)
     combined.save_pretrained("vit_lstm.pth")
+
+
+async def bert_crf_textonly():
+    print("Loading dataset")
+    data, labels, class_occurrences, vocabulary = await load_twitter_dataset()
+    print("Dataset loaded")
+    token_manager = TokenManager()
+    login(token_manager.get_access_token())
+    model, tokenizer = create_roberta_base()
+    crf_model = BertCRF(model, len(labels.keys()))
+    crf_model = train.training_loop_text_only(crf_model, data['train'], data["val"], data["test"], tokenizer,class_occurrences, epochs=5)
+    torch.save(crf_model.state_dict(), "models/bert_crf.pth")
+
+
 
 async def llama_vit_multimodal():
     model_name = "meta-llama/Llama-3.1-8B"
@@ -103,18 +119,16 @@ async def llama_vit_multimodal():
     vit = ViT(vit_model, vit_processor)
     print("Creating vit llama model")
     model, tokenizer = create_llama_model(model_name, create_default_quantization_config())
-    combined = CombinedModel(vit, create_parameter_efficient_model(model), len(labels.keys()))
+    combined = CombinedModel(vit,create_parameter_efficient_model(model),len(labels.keys()))
 
     print("Training combined model")
-    combined = train.training_loop_combined(combined, data['train'], data["val"], data["test"], tokenizer,
-                                            class_occurrences, epochs=5)
+    combined = train.training_loop_combined(combined, data['train'], data["val"], data["test"], tokenizer,class_occurrences, epochs=15)
     torch.save(combined.state_dict(), "models/llama_vit.pth")
-    # save_model(combined, "models/llama_vit_raw.pth")
-    # combined.text_model = combined.text_model.merge_and_unload()
+    #save_model(combined, "models/llama_vit_raw.pth")
+    #combined.text_model = combined.text_model.merge_and_unload()
     print("Saving model")
-    # save_lora_model(combined,"peft_models")
+    #save_lora_model(combined,"peft_models")
     print("Leaving")
-
 
 def create_random_tensors(dim: tuple) -> torch.Tensor:
     return torch.randint(low=0, high=3, size=dim, dtype=torch.int)
@@ -154,7 +168,7 @@ def conf_matrix_f1():
     print(m.macro_f1(matrix))
 
 if __name__ == "__main__":
-    asyncio.run(create_vit_lstm_model())
+    asyncio.run(llama_vit_multimodal())
     """
     random_input = torch.LongTensor([1, 2, 3, 4, 5, 6, 7])
     lstm = create_lstm(24)
