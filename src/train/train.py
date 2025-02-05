@@ -116,8 +116,12 @@ def perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, sched
         aligned_labels = torch.tensor(align_labels(word_ids, labels), device=device, dtype=torch.long).unsqueeze(0).repeat(images.size(0),1)
         #aligned_labels = torch.tensor(align_labels(word_ids, labels), device=device, dtype=torch.long).unsqueeze(0)
         outputs = model(images, text)
+        aligned_labels = aligned_labels[0:, 1:]
+        outputs = outputs[0:, 1:]
+        mask = torch.ones_like(aligned_labels,device=device).bool()
+        loss = model.crf_pass(outputs, aligned_labels, mask)
 
-        loss = loss_criterion(outputs.permute(0,2,1), aligned_labels)
+        #loss = loss_criterion(outputs.permute(0,2,1), aligned_labels)
         running_loss += loss.item()
         #y_pred.append(decode_labels_majority_vote(word_ids[1:], torch.argmax(outputs.squeeze(0),dim=1)[1:]))
         #y_true.append(labels)
@@ -126,8 +130,9 @@ def perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, sched
         optimizer.step()
         scheduler.step()
 
-        y_pred.append(torch.argmax(outputs, dim=-1)[0:, 1:].tolist())
-        y_true.append(aligned_labels[0:, 1:].tolist())
+        y_pred.append(model.crf_decode(outputs, mask))
+        #y_pred.append(torch.argmax(outputs, dim=-1).tolist())
+        y_true.append(aligned_labels.tolist())
 
     metrics = Metrics(y_pred, y_true, 9, {_:str(_) for _ in range(9)})
     macro_f1 = metrics.macro_f1(metrics.confusion_matrix())
