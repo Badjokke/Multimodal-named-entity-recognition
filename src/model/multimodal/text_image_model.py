@@ -11,13 +11,12 @@ class CombinedModel(torch.nn.Module):
         self.n_embeds = 1024
 
         self.__out_layer = torch.nn.Linear(768, num_labels)
-        self.__text_lin_layer = torch.nn.Linear(text_model.config.hidden_size, self.n_embeds)
 
-        self.text_experts = torch.nn.ModuleList([Expert(self.n_embeds) for _ in range(num_experts)])
-        self.visual_experts = torch.nn.ModuleList([Expert(visual_model.output_size) for _ in range(num_experts)])
-
-        self.text_gate = NoisyTopkRouter(self.n_embeds, num_experts, 3)
-        self.visual_gate = NoisyTopkRouter(visual_model.output_size, num_experts, 3)
+        #self.__text_lin_layer = torch.nn.Linear(text_model.config.hidden_size, self.n_embeds)
+        #self.text_experts = torch.nn.ModuleList([Expert(self.n_embeds) for _ in range(num_experts)])
+        #self.visual_experts = torch.nn.ModuleList([Expert(visual_model.output_size) for _ in range(num_experts)])
+        #self.text_gate = NoisyTopkRouter(self.n_embeds, num_experts, 3)
+        #self.visual_gate = NoisyTopkRouter(visual_model.output_size, num_experts, 3)
 
         self.__fusion_layer = torch.nn.Sequential(
             torch.nn.Linear(visual_model.output_size + self.n_embeds, 768),
@@ -34,10 +33,10 @@ class CombinedModel(torch.nn.Module):
         text_out = F.normalize(text_out, p=2, dim=-1)
 
         text_out = text_out.repeat(visual_out.size(0), 1, 1)
-        text_out = self.__text_lin_layer(text_out)
-
-        text_out = self.__expert_pass(text_out, self.text_experts, self.text_gate)
-        visual_out = self.__expert_pass(visual_out, self.visual_experts, self.visual_gate)
+        
+        #text_out = self.__text_lin_layer(text_out)
+        #text_out = self.__expert_pass(text_out, self.text_experts, self.text_gate)
+        #visual_out = self.__expert_pass(visual_out, self.visual_experts, self.visual_gate)
 
         visual_out = visual_out.unsqueeze(1).expand(-1, text_out.size(1), -1)
         combined = self.__fusion_layer(torch.cat([text_out, visual_out], dim=-1))
