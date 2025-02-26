@@ -4,20 +4,18 @@ import time
 import torch
 from huggingface_hub import login
 
-from data.dataset import load_twitter_dataset, dataset_text_only
+from data.dataset import load_twitter_dataset
 from data.dataset_preprocessor import TwitterPreprocessor
 from data.text_data_processor.stemming_json_data_processor import StemmingTextDataProcessor
-from model.configuration.quantization import create_default_quantization_config, create_parameter_efficient_model
-from model.model_factory import (create_llama_model, create_vit, create_lstm, create_bert_large, create_model_for_lm)
+from model.model_factory import (create_vit, create_lstm, create_bert_large)
 from model.multimodal.text_image_model import CombinedModel
-from model.language.llama import LlamaLM
-from model.util import load_and_filter_state_dict,save_model, create_message, freeze_model, load_lora_model, save_lora_model
-from model.visual.convolutional_net import ConvNet
+from model.util import load_and_filter_state_dict
 from model.visual.vit_wrapper import ViT
 from security.token_manager import TokenManager
 from train import train
-from train.train import training_loop_combined, training_loop_text_only
-
+from train.train import training_loop_combined
+from closedai.client.open_api_client import OpenAIClient
+from closedai.train import OpenAIEval
 
 async def inference(model_path):
     print("Loading dataset")
@@ -62,7 +60,7 @@ async def create_vit_lstm_model():
 async def llama_vit_multimodal():
     model_name = "meta-llama/Llama-3.1-8B"
     print("Loading dataset")
-    data, labels, class_occurrences, vocabulary = await load_twitter_dataset()
+    data, labels, class_occurrences, vocabulary = await load_twitter_dataset(text_processors=[StemmingTextDataProcessor()])
     print("Dataset loaded")
 
     token_manager = TokenManager()
@@ -84,11 +82,18 @@ async def llama_vit_multimodal():
     #save_lora_model(combined,"peft_models")
     print("Leaving")
 
+async def open_api_eval():
+    client = OpenAIClient(TokenManager().get_openapi_key())
+    data, labels, class_occurrences, vocabulary = await load_twitter_dataset(text_processors=[StemmingTextDataProcessor()])
+    oai_eval = OpenAIEval(client, labels)
+    oai_eval.eval_mner(data["test"],)
+    print("aaa")
 
 
 if __name__ == "__main__":
+    #asyncio.run(open_api_eval())
+    #asyncio.run(preprocess_twitter())
     asyncio.run(llama_vit_multimodal())
-    #asyncio.run(llama_vit_multimodal())
     """
     model, tokenizer = create_model_for_lm("meta-llama/Llama-3.1-8B", create_default_quantization_config())
     extracted = []
