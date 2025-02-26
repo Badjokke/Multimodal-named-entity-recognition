@@ -7,6 +7,7 @@ from torch import from_numpy
 
 io_pool_exec = ThreadPoolExecutor(max_workers=10)
 
+import base64
 
 def parse_twitter_text(content: bytes) -> Future[list[dict[str, str]]]:
     return io_pool_exec.submit(_parse_twitter_text, content)
@@ -21,6 +22,12 @@ def _image_to_tensor(image: bytes):
     img_decoded = opencv.cvtColor(img_decoded, opencv.COLOR_BGR2RGB)
     tensor = from_numpy(img_decoded).permute(2, 0, 1)
     return tensor / 255
+
+def image_to_base64(image: bytes) -> Future[str]:
+    return io_pool_exec.submit(_image_to_base64, image)
+
+def _image_to_base64(image: bytes) -> str:
+    return base64.b64encode(image).decode("utf-8")
 
 
 def _parse_twitter_text(content: bytes) -> list[dict[str, str]]:

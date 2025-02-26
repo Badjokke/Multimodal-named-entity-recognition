@@ -6,7 +6,7 @@ import torch
 
 from async_io import filesystem
 from data.data_processor import DataProcessor
-from data.data_processors import image_to_tensor, parse_twitter_text
+from data.data_processors import image_to_tensor, parse_twitter_text, image_to_base64
 
 input_path = "../dataset/preprocessed/twitter_2017"
 
@@ -34,7 +34,7 @@ async def _load_twitter_dataset_image():
     image_path = f"{input_path}/image_preprocessed"
     image_que = asyncio.Queue(2 ** 10)
     result = await asyncio.gather(filesystem.load_directory_contents(image_path, image_que),
-                                  _transform_images(image_to_tensor, image_que))
+                                  _transform_images(image_to_base64, image_que))
     return result[1]
 
 
@@ -139,9 +139,8 @@ def _process_image_refs(image_set: dict[str, torch.Tensor], image_refs: list[str
     if return_first:
         return image_set[image_refs[0]] if image_data_processor is None else [
             _apply_data_processor(image_set[image_refs[0]], image_data_processor)]
-    return torch.stack(list(
-        map(lambda ref: image_set[ref], image_refs)) if image_data_processor is None else _map_with_data_processor(
-        image_refs, image_data_processor))
+    return (list(
+        map(lambda ref: image_set[ref], image_refs)) if image_data_processor is None else _map_with_data_processor(list(map(lambda ref: image_set[ref], image_refs)),image_data_processor))
 
 
 def _map_with_data_processor(items: list[Union[str, torch.Tensor]], data_processors: list[DataProcessor]):

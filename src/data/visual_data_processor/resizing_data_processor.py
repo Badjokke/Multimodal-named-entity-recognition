@@ -16,7 +16,6 @@ class ResizingDataProcessor(DataProcessor):
 
     def process_data(self, data: Union[bytes, str, Tensor]) -> Future[bytes]:
         return self.io_pool_exec.submit(self.__resize_image, data, self.dim)
-        pass
 
     @staticmethod
     def __resize_image(image_binary: bytes, dim: tuple[int, int]) -> bytes:
