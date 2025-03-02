@@ -1,6 +1,6 @@
 import torch
 
-from torchcrf import CRF
+from TorchCRF import CRF
 
 
 class CombinedModel(torch.nn.Module):

@@ -37,30 +37,36 @@ class Util:
 
     @staticmethod
     def parse_json(text: str):
-        return json.loads(text)
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            return None
 
     @staticmethod
     def json_response_to_labels(content: list[dict[str, str]], label_map: dict[str, int]):
         y_pred = []
         for c in content:
-            y_pred.append(label_map[c["label"]])
+            y_pred.append(label_map[Util.get_label_from_gpt_response(c)])
         return y_pred
+    @staticmethod
+    def get_label_from_gpt_response(predicted_token):
+        if type(predicted_token) == list:
+            return predicted_token[1] if len(predicted_token) == 2 else "O"
+        return predicted_token["label"]
 
     @staticmethod
     def pad_gpt_response_to_target(y_true:dict[str, Union[list[int],list[str]]], y_pred:dict[str, Union[list[int],list[str]]], pad_label: int):
-        words = set(y_true["sentence"])
-        labels = y_true["label"]
-        pred_words = set(y_pred["sentence"])
-        pred_labels = y_pred["label"]
-
-        diff = words.difference(pred_words)
-        for i in range(len(diff)):
-            pred_labels.append(pad_label)
-        return pred_labels
-
+        y_predicted = []
+        words_pred = Util.list_to_value_index_dict(y_pred["text"])
+        words_true = Util.list_to_value_index_dict(y_true["text"], True)
+        for index, w in enumerate(words_true):
+            w = w.split("__")[0]
+            if w not in words_pred:
+                y_predicted.append(pad_label)
+                continue
+            y_predicted.append(y_pred["labels"][words_pred[w]] if words_pred[w] < len(y_pred["labels"]) else pad_label)
+        return y_predicted
 
     @staticmethod
-    def truncate_gpt_response_to_target(y_true: dict[str, Union[list[int],list[str]]], y_pred:dict[str, Union[list[int],list[str]]]):
-        pass
-
-
+    def list_to_value_index_dict(item:list, positional_information = False) -> dict:
+        return {f"value__{index}": index for index, value in enumerate(item)} if positional_information else {value: index for index, value in enumerate(item)}

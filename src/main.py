@@ -87,27 +87,9 @@ async def open_api_eval():
     data, labels, class_occurrences, vocabulary = await load_twitter_dataset(text_processors=[StemmingTextDataProcessor()])
     oai_eval = OpenAIEval(client, labels)
     oai_eval.eval_mner(data["test"],)
-    print("aaa")
 
 
 if __name__ == "__main__":
     #asyncio.run(open_api_eval())
     #asyncio.run(preprocess_twitter())
-    asyncio.run(llama_vit_multimodal())
-    """
-    model, tokenizer = create_model_for_lm("meta-llama/Llama-3.1-8B", create_default_quantization_config())
-    extracted = []
-    llama = LlamaLM(model,tokenizer)
-    sample_text = " ".join(["DCC", "caption", ":", "Gahyeon", "was", "shy", "because", "of", "Bora", "s", "hand", "for", "a", "moment",
-     "!", "lol"])
-    entities = llama.extract_entities(sample_text)
-    extracted.append(entities)
-
-    sample_text = " ".join(["Dressed", "as", "Shin", "Hayata", ".", "Happy", "Halloween", "!", "!", "!", "!", "#", "ultraman", "#", "halloween2022"])
-    entities = llama.extract_entities(sample_text)
-    extracted.append(entities)
-    print("\nDetected entities:")
-    for i in range(len(extracted)):
-        for entity, type_ in extracted[i]:
-            print(f"- {entity}: {type_}")
-    """
+    asyncio.run(open_api_eval())
