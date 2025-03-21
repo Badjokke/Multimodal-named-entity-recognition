@@ -11,4 +11,4 @@ class ViT(torch.nn.Module):
         processed = self.processor(image_feats, return_tensors='pt', do_rescale=False).to(device)
         model_out = self.model(**processed)
         #(batch_size, hidden_state_size)
-        return model_out.last_hidden_state.mean(dim=1)
+        return model_out.pooler_output
