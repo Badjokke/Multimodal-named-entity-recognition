@@ -6,7 +6,7 @@ import torch
 from huggingface_hub import login
 
 from data.twitter2017_dataset_loader import load_twitter_dataset, dataset_text_only
-from data.dataset_preprocessor import Twitter2017Preprocessor
+from data.twitter2017_preprocessor import Twitter2017Preprocessor
 from data.text_data_processor.stemming_json_data_processor import StemmingTextDataProcessor
 from metrics.metrics import Metrics
 from metrics.plot_builder import PlotBuilder

@@ -2,9 +2,10 @@ import asyncio
 from typing import Callable, Coroutine
 
 from async_io import filesystem
-from .text_data_processor.json_data_processor import TwitterJsonDataProcessor
-from .visual_data_processor.resizing_data_processor import ResizingDataProcessor
+from data.text_data_processor.json_data_processor import TwitterJsonDataProcessor
+from data.visual_data_processor.resizing_data_processor import ResizingDataProcessor
 from data.abstract_dataset_preprocessor import AbstractDatasetPreprocessor
+
 
 class Twitter2017Preprocessor(AbstractDatasetPreprocessor):
     def __init__(self, input_path="../dataset/twitter_2017", output_path="../dataset/preprocessed/twitter_2017"):
