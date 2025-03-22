@@ -1,95 +1,167 @@
 import asyncio
 import time
+from random import randint
 
 import torch
 from huggingface_hub import login
 
-from data.dataset import load_twitter_dataset
-from data.dataset_preprocessor import TwitterPreprocessor
+from data.twitter2017_dataset_loader import load_twitter_dataset, dataset_text_only
+from data.dataset_preprocessor import Twitter2017Preprocessor
 from data.text_data_processor.stemming_json_data_processor import StemmingTextDataProcessor
-from model.model_factory import (create_vit, create_lstm, create_bert_large)
+from metrics.metrics import Metrics
+from metrics.plot_builder import PlotBuilder
+from metrics.plots import SimplePlot
+from model.configuration.quantization import create_default_quantization_config, create_parameter_efficient_model
+from model.model_factory import (create_llama_model, create_roberta_base, create_vit, create_token_classification_llama, create_lstm)
 from model.multimodal.text_image_model import CombinedModel
-from model.util import load_and_filter_state_dict
+from model.util import load_and_filter_state_dict, create_message
+from model.visual.convolutional_net import ConvNet
 from model.visual.vit_wrapper import ViT
 from security.token_manager import TokenManager
 from train import train
-from train.train import training_loop_combined
-from closedai.client.open_api_client import OpenAIClient
-from closedai.train import OpenAIEval
+from train.train import training_loop_combined,training_loop_combined_lstm
 
 async def inference(model_path):
+    model_name = "meta-llama/Llama-3.1-8B"
     print("Loading dataset")
-    data, labels, class_occurrences, vocabulary = await load_twitter_dataset()
+    data, labels = await load_twitter_dataset()
     print("Dataset loaded")
     # cnn((image[1]["0_0.jpg"][None,:,:,:])/255)
     token_manager = TokenManager()
     login(token_manager.get_access_token())
+    cnn = ConvNet()
     # cnn(torch.rand(3, 256, 256))
     print("Creating model")
-    model, processor = create_vit()
-    vit = ViT(model, processor)
-    model, tokenizer = create_bert_large()
-    combined = CombinedModel(vit, model, len(labels.keys()))
+    model, tokenizer = create_llama_model(model_name, create_default_quantization_config())
+    combined = CombinedModel(cnn, model, len(labels.keys()))
 
     state_dict = load_and_filter_state_dict(model_path)
     combined.load_state_dict(state_dict)
-    loss, metrics = train.validate_after_epoch(combined,tokenizer,None, data['test'])
-    print(f"loss: {loss}")
-    print(f"metrics: {metrics}")
+    train.inference_loop_combined_model(combined, data['test'], tokenizer)
+
 
 async def preprocess_twitter():
     print("Loading dataset, image and text")
     start = time.time()
-    preprocessor = TwitterPreprocessor()
-    await preprocessor.load_twitter_dataset()
+    preprocessor = Twitter2017Preprocessor()
+    await preprocessor.load_and_transform_dataset()
     # await data_preprocessor.load_twitter_dataset(process_twitter2017_text, process_twitter2017_image)
     end = time.time()
     print(f"Loading took: {(end - start) * 1000} ms")
 
+async def train_llama_classifier_text():
+    model_name = "meta-llama/Llama-3.1-8B"
+    print("Loading dataset")
+    data, labels = await dataset_text_only()
+    print("Dataset loaded")
+    token_manager = TokenManager()
+    login(token_manager.get_access_token())
+
+    model, tokenizer = create_token_classification_llama(model_name, create_default_quantization_config())
+    model = create_parameter_efficient_model(model)
+
+    model = train.training_loop_text_only(model, data["train"], data["val"],tokenizer)
+    model.merge_and_unload()
+    print("Saving model")
+    MODEL_OUT_PATH = "./llama_text.pth"
+    torch.save(model.state_dict(), MODEL_OUT_PATH)
+    print("Leaving")
+
+async def create_roberta_multimodal():
+    # print("Loading dataset")
+    data, labels = await load_twitter_dataset()
+    # print("Dataset loaded")
+    token_manager = TokenManager()
+    login(token_manager.get_access_token())
+    model, tokenizer = create_roberta_base()
+    cnn = ConvNet()
+    combined = CombinedModel(cnn, model, len(labels.keys()))
+    training_loop_combined(combined, data["train"], data["val"], tokenizer)
+
+def merge_lora_layers_with_text_model(combined_model: CombinedModel) -> torch.nn.Module:
+    return combined_model.text_model.merge_and_unload()
+
 async def create_vit_lstm_model():
     data, labels, class_occurrences, vocabulary = await load_twitter_dataset(text_processors=[StemmingTextDataProcessor()])
-    lstm = create_lstm(len(vocabulary))
+    lstm = create_lstm(len(vocabulary.keys()))
     vit, processor = create_vit()
     vit = ViT(vit, processor)
     combined = CombinedModel(vit, lstm, len(labels.keys()))
-    combined = training_loop_combined(combined, data["train"], data["val"], data["test"], class_occurrences, epochs=20)
+    combined = training_loop_combined_lstm(combined, data["train"], data["val"], vocabulary, class_occurrences, epochs=10)
     combined.save_pretrained("vit_lstm.pth")
-
 
 
 async def llama_vit_multimodal():
     model_name = "meta-llama/Llama-3.1-8B"
     print("Loading dataset")
-    data, labels, class_occurrences, vocabulary = await load_twitter_dataset(text_processors=[StemmingTextDataProcessor()])
+    data, labels, class_occurrences, vocabulary = await load_twitter_dataset()
     print("Dataset loaded")
 
+    # cnn((image[1]["0_0.jpg"][None,:,:,:])/255)
     token_manager = TokenManager()
     login(token_manager.get_access_token())
-
     vit_model, vit_processor = create_vit()
     vit = ViT(vit_model, vit_processor)
+    # cnn(torch.rand(3, 256, 256))
     print("Creating vit llama model")
-    #model, tokenizer = create_llama_model(model_name, create_default_quantization_config())
-    model, tokenizer = create_bert_large()
-    combined = CombinedModel(vit,(model),len(labels.keys()))
-
+    model, tokenizer = create_llama_model(model_name, create_default_quantization_config())
+    combined = CombinedModel(vit, create_roberta_base(), len(labels.keys()))
     print("Training combined model")
-    combined = train.training_loop_combined(combined, data['train'], data["val"], data["test"], tokenizer,class_occurrences,labels, epochs=15)
-    torch.save(combined.state_dict(), "models/bert_vit_crf_bilstm_rarevents.pth")
-    #save_model(combined, "models/llama_vit_raw.pth")
-    #combined.text_model = combined.text_model.merge_and_unload()
+    combined = train.training_loop_combined(combined, data['train'], data["val"], tokenizer,class_occurrences, epochs=10)
+    #combined.text_model = merge_lora_layers_with_text_model(combined)
     print("Saving model")
-    #save_lora_model(combined,"peft_models")
+    combined.save_pretrained("peft_finetuned_llama.pth")
+    MODEL_OUT_PATH = "./combined_model_roberta_vit.pth"
+    torch.save(combined.state_dict(), MODEL_OUT_PATH)
     print("Leaving")
 
-async def open_api_eval():
-    client = OpenAIClient(TokenManager().get_openapi_key())
-    data, labels, class_occurrences, vocabulary = await load_twitter_dataset(text_processors=[StemmingTextDataProcessor()])
-    oai_eval = OpenAIEval(client, labels)
-    oai_eval.eval_mner(data["test"],)
+def create_random_tensors(dim: tuple) -> torch.Tensor:
+    return torch.randint(low=0, high=3, size=dim, dtype=torch.int)
 
+async def run_vit():
+    model, processor = create_vit()
+    r_image = torch.rand((3, 256, 256), dtype=torch.float32)
+    inputs = processor(r_image, return_tensors="pt")
+    outputs = model(**inputs)
+    embedding = outputs.last_hidden_state
+    print(embedding)
+
+def draw_dummy_diagram():
+    x = [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]]
+    y = [[1.5788260523967825, 1.313030738320009, 1.2059657401559953, 1.1473848533745683, 1.1107720396701792,
+          1.0869205966486934, 1.07328355824383, 1.0652151519363022, 1.0608894993171447, 1.0601054522304882]]
+    simple_plot: SimplePlot = PlotBuilder.build_simple_plot(x, y,
+                                                            colors=["blue"],
+                                                            x_axis_label="epoch",
+                                                            y_axis_label="loss",
+                                                            plot_title="Vit+Llama training",
+                                                            labels=["training_loss"]
+                                                            )
+    simple_plot.plot()
+
+def conf_matrix_f1():
+    y_pred = []
+    y_true = []
+    for i in range(20):
+        l = randint(3, 20)
+        y_pred.append(torch.argmax(create_random_tensors((l, 3)), dim=-1))
+        y_true.append(create_random_tensors((l,)))
+    m = Metrics(y_pred, y_true, 3, {0: "dog", 1: "cat", 2: "horse"})
+    matrix = m.confusion_matrix()
+    matrix.print_matrix()
+    m.f1(matrix, 0)
+    print(m.macro_f1(matrix))
 
 if __name__ == "__main__":
-    #asyncio.run(open_api_eval())
-    #asyncio.run(preprocess_twitter())
-    asyncio.run(open_api_eval())
+    asyncio.run(create_vit_lstm_model())
+    """
+    random_input = torch.LongTensor([1, 2, 3, 4, 5, 6, 7])
+    lstm = create_lstm(24)
+    features = lstm(random_input)
+    print(features)
+    """
+    """
+    # asyncio.run(create_roberta_multimodal())
+
+    # asyncio.run(llama_vit_multimodal())
+    """

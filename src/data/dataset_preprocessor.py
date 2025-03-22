@@ -4,16 +4,16 @@ from typing import Callable, Coroutine
 from async_io import filesystem
 from .text_data_processor.json_data_processor import TwitterJsonDataProcessor
 from .visual_data_processor.resizing_data_processor import ResizingDataProcessor
+from data.abstract_dataset_preprocessor import AbstractDatasetPreprocessor
 
-
-class TwitterPreprocessor:
+class Twitter2017Preprocessor(AbstractDatasetPreprocessor):
     def __init__(self, input_path="../dataset/twitter_2017", output_path="../dataset/preprocessed/twitter_2017"):
         self.input_path = input_path
         self.output_path = output_path
         self.text_processor = TwitterJsonDataProcessor()
         self.image_processor = ResizingDataProcessor()
 
-    async def load_twitter_dataset(self, ):
+    async def load_and_transform_dataset(self):
         text_task = asyncio.create_task(self.__load_twitter_text_dataset(filesystem.save_file))
         image_task = asyncio.create_task(self.__load_twitter_image_dataset(filesystem.save_file_consumer))
         return await asyncio.gather(text_task, image_task)
