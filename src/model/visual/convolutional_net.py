@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import (flatten)
@@ -7,16 +8,33 @@ class ConvNet(nn.Module):
     def __init__(self):
         super().__init__()
         # input image dimension
-        self.output_size = 1080
-        self.__input_size = (3, 256, 256)
-        self.conv1 = nn.Conv2d(3, 6, kernel_size=5)
-        self.max_pool1 = nn.MaxPool2d(4, 4)
-        self.conv2 = nn.Conv2d(6, 16, kernel_size=4)
-        self.fc1 = nn.Linear(16 * 15 * 15, self.output_size)
+        self.__input_size = (3, 224, 224)
+        self.alex_net = nn.Sequential(
+            nn.Conv2d(3, 96, kernel_size=11, stride=4, padding=0),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),
+            nn.Conv2d(96, 256, kernel_size=5, padding=2),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),
+            nn.Conv2d(256, 384, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(384, 384, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(384, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),
+            nn.Flatten(),
+            nn.Linear(6400, 4096),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.5),
+            nn.Linear(4096, 4096),
+            nn.ReLU(inplace=True),
+        )
+        self.output_size = 4096
 
     def forward(self, x):
-        x = self.max_pool1(F.relu(self.conv1(x)))
-        x = self.max_pool1(F.relu(self.conv2(x)))
-        x = flatten(x, 0)
-        x = F.relu(self.fc1(x))
-        return x
+        return self.alex_net(x)
+
+
+alex = ConvNet()
+print(alex(torch.rand((2, 3, 224, 224))))
