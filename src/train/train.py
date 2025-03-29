@@ -5,8 +5,9 @@ import torch
 from peft import PeftModel
 from seqeval.metrics import classification_report
 from sklearn.utils.class_weight import compute_class_weight
+from torch.utils.data import DataLoader
 from transformers import get_linear_schedule_with_warmup
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim.lr_scheduler import ReduceLROnPlateau, CyclicLR, OneCycleLR
 from metrics.metrics import Metrics
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -44,69 +45,160 @@ def align_labels(word_ids, labels):
 def _create_optimizer(parameters: Iterable[torch.Tensor], learning_rate=2e-5, momentum=0.9) -> torch.optim.Optimizer:
     return torch.optim.SGD(parameters, lr=learning_rate, momentum=0.9,nesterov=True,weight_decay=0.0001)
 
-
 def _create_adamw_optimizer(model, learning_rate=1e-5) -> torch.optim.AdamW:
     no_decay = ['bias', 'LayerNorm.weight']
+    # Group parameters with more fine-grained learning rates
     bert_params = [(n, p) for n, p in model.text_model.named_parameters()]
     vit_params = [(n, p) for n, p in model.visual_model.named_parameters()]
+    fusion_params = [(n, p) for n, p in model.named_parameters() if
+                     any(x in n for x in ['fusion_layer', 'projection_layer', 'text_projection_layer'])]
+    bilstm_params = [(n, p) for n, p in model.named_parameters() if 'bilstm' in n]
+    crf_params = [(n, p) for n, p in model.named_parameters() if 'crf' in n]
     other_params = [(n, p) for n, p in model.named_parameters() if
-                    not any(x in n for x in ['text_model', 'visual_model'])]
-
+                    not any(x in n for x in ['text_model', 'visual_model', 'fusion_layer',
+                                             'projection_layer', 'text_projection_layer', 'bilstm', 'crf'])]
     optimizer_grouped_parameters = [
-        # BERT parameters
+        # BERT parameters - slightly higher learning rate
         {
             'params': [p for n, p in bert_params if not any(nd in n for nd in no_decay)],
             'weight_decay': 0.01,
-            'lr': 1e-6
+            'lr': 8e-6  # Increased from 1e-6
         },
         {
             'params': [p for n, p in bert_params if any(nd in n for nd in no_decay)],
             'weight_decay': 0.0,
-            'lr': 1e-6
+            'lr': 8e-6
         },
         # ViT parameters
         {
             'params': [p for n, p in vit_params if not any(nd in n for nd in no_decay)],
             'weight_decay': 0.01,
-            'lr': 1e-5
+            'lr': 3e-5  # Increased from 1e-5
         },
         {
             'params': [p for n, p in vit_params if any(nd in n for nd in no_decay)],
             'weight_decay': 0.0,
-            'lr': 1e-5
+            'lr': 3e-5
         },
+        # Fusion layer - critical for performance
+        {
+            'params': [p for n, p in fusion_params if not any(nd in n for nd in no_decay)],
+            'weight_decay': 0.01,
+            'lr': 5e-4  # Higher learning rate for fusion
+        },
+        {
+            'params': [p for n, p in fusion_params if any(nd in n for nd in no_decay)],
+            'weight_decay': 0.0,
+            'lr': 5e-4
+        },
+        # BiLSTM parameters
+        {
+            'params': [p for n, p in bilstm_params if not any(nd in n for nd in no_decay)],
+            'weight_decay': 0.01,
+            'lr': 5e-4  # Modified learning rate
+        },
+        {
+            'params': [p for n, p in bilstm_params if any(nd in n for nd in no_decay)],
+            'weight_decay': 0.0,
+            'lr': 5e-4
+        },
+        # CRF parameters
+        {
+            'params': [p for n, p in crf_params],
+            'weight_decay': 0.0,  # No weight decay for CRF
+            'lr': 2e-4  # Higher learning rate for CRF
+        },
+        # Other parameters
         {
             'params': [p for n, p in other_params if not any(nd in n for nd in no_decay)],
             'weight_decay': 0.01,
-            'lr': 1e-5  # Higher learning rate for new parameters
+            'lr': 2e-5
         },
         {
             'params': [p for n, p in other_params if any(nd in n for nd in no_decay)],
             'weight_decay': 0.0,
-            'lr': 1e-5
+            'lr': 2e-5
         }
     ]
-    return torch.optim.AdamW(optimizer_grouped_parameters, weight_decay=0.01, eps=1e-8, betas=(0.9, 0.999))
+    # Use a lower epsilon for better handling of small gradients
+    return torch.optim.AdamW(optimizer_grouped_parameters, weight_decay=0.01, eps=1e-9, betas=(0.9, 0.98))
 
+def create_linear_scheduler(optimizer, training_steps, warmup_steps):
+    return get_linear_schedule_with_warmup(
+        optimizer,
+        num_warmup_steps=warmup_steps,
+        num_training_steps=training_steps
+    )
 
 def _create_scheduler(optimizer, training_steps,) -> torch.optim.lr_scheduler.CosineAnnealingLR:
     return get_linear_schedule_with_warmup(
     optimizer,
-    num_warmup_steps=training_steps//20,
+    num_warmup_steps=training_steps//10,
     num_training_steps=training_steps
 )
+
+def _create_warm_cosine_scheduler(optimizer):
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+        optimizer,
+        T_0=5,  # Initial restart period
+        T_mult=2,  # Multiplicative factor for restart
+        eta_min=1e-6  # Minimum learning rate
+    )
+    return scheduler
+
+def create_cosine_scheduler(optimizer, training_steps):
+    # Custom warmup + cosine schedule
+    from transformers import get_cosine_schedule_with_warmup
+
+    return get_cosine_schedule_with_warmup(
+        optimizer,
+        num_warmup_steps=int(training_steps * 0.15),  # 15% warmup
+        num_training_steps=training_steps
+    )
+
 def create_plateau_scheduler(optimizer):
-    return ReduceLROnPlateau(optimizer, 'max', patience=1, threshold=1)
+    return ReduceLROnPlateau(optimizer, 'max', patience=1, threshold=0.01)
+
+def create_cyclic_scheduler(optimizer):
+    return CyclicLR(
+        optimizer,
+        base_lr=1e-7,  # Min LR
+        max_lr=1e-6,  # Max LR
+        step_size_up=300,  # Steps to reach max_lr
+        mode='triangular2',  # LR policy
+        cycle_momentum=False)
+
+def create_one_cycle_scheduler(optimizer, num_of_training_steps):
+    return OneCycleLR(
+        optimizer,
+        max_lr=5e-6,  # Slightly more aggressive to escape plateau
+        total_steps=num_of_training_steps,
+        pct_start=0.15,  # Shorter warmup since you learn quickly initially
+        anneal_strategy='cos',
+        div_factor=25,
+        final_div_factor=1000
+    )
+def create_simple_adamw(model):
+    optimizer_grouped_parameters = [
+        {'params': model.text_model.parameters(), 'lr': 2e-5},
+        {'params': model.visual_model.parameters(), 'lr': 1e-4},
+        {'params': [p for n, p in model.named_parameters() if 'text_model' not in n and 'visual_model' not in n], 'lr': 1e-3}
+    ]
+    optimizer = torch.optim.AdamW(optimizer_grouped_parameters, weight_decay=0.01)
 
 def training_loop_combined(model: Union[torch.nn.Module, PeftModel], train_data, validation_data, test_data, tokenizer,
                            class_occurrences, labels, epochs=10, patience=3):
     model.to(device)
     loss_criterion = _create_cross_entropy_loss_criterion(class_occurrences)
     optimizer = _create_adamw_optimizer(model)
-    scheduler = _create_scheduler(optimizer, epochs * len(train_data))
+    #scheduler = create_cosine_scheduler(optimizer, epochs * len(train_data))
+    #scheduler = create_cyclic_scheduler(optimizer)
+    #scheduler = _create_scheduler(optimizer, epochs * len(train_data))
     #scheduler = create_plateau_scheduler(optimizer)
+    scheduler = _create_warm_cosine_scheduler(optimizer)
+    #scheduler = create_linear_scheduler(optimizer,epochs * len(train_data), len(train_data) * 0.1)
     w = _compute_class_weights_rare_events(class_occurrences)
-
+    res = []
     # optimizer, scheduler = setup_optimizer(model, t_max=epochs*len(train_data))
     for epoch in range(epochs):
         #print(f"==EPOCH {epoch}==")
@@ -128,6 +220,7 @@ def training_loop_combined(model: Union[torch.nn.Module, PeftModel], train_data,
         print(f"[epoch: {epoch + 1}] Validation loss: {val_loss[0]}. Validation macro f1: {val_loss[1]['macro']}; micro f1: {val_loss[1]['micro']}, acc: {val_loss[1]['accuracy']}")
         print(f"[epoch: {epoch + 1}] Test loss: {test_results[0]}. Test macro f1: {test_results[1]['macro']}; micro f1: {test_results[1]['micro']}, acc: {test_results[1]['accuracy']}")
         print()
+        res.append((training_loss, val_loss, test_results))
     return model
 
 
@@ -146,6 +239,9 @@ def map_to_base_labels(y, labels_mapping):
         base.append(base_batch)
     return base
 
+def contains_entity(y):
+    return any(y) != 0
+
 def perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, scheduler, labels_mapping, w):
     model.train()
     running_loss = 0.0
@@ -154,6 +250,8 @@ def perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, sched
     for i in range(len(train_data)):
         data_sample = train_data[i]
         images, labels, text = data_sample[1].to(device), torch.tensor(data_sample[2], dtype=torch.long,device=device), tokenizer(data_sample[0], is_split_into_words=True, return_tensors="pt").to(device)
+        #if not contains_entity(labels):
+        #   continue
         word_ids = text.word_ids()
         text = {key: value.to(device) for key, value in text.items()}
 
@@ -175,6 +273,7 @@ def perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, sched
         loss.backward()
         optimizer.step()
         scheduler.step()
+
         #y_pred.append(decode_labels_majority_vote(word_ids[1:-1],model.crf_decode(outputs, mask)).tolist())
         #y_pred.append(torch.argmax(outputs, dim=-1).tolist())
         #y_tr_mapped = map_to_base_labels(aligned_labels.tolist(), labels_mapping)

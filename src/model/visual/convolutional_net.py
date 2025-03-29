@@ -1,13 +1,9 @@
-import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch import (flatten)
 
 
 class ConvNet(nn.Module):
     def __init__(self):
         super().__init__()
-        # input image dimension
         self.__input_size = (3, 224, 224)
         self.alex_net = nn.Sequential(
             nn.Conv2d(3, 96, kernel_size=11, stride=4, padding=0),
@@ -34,7 +30,3 @@ class ConvNet(nn.Module):
 
     def forward(self, x):
         return self.alex_net(x)
-
-
-alex = ConvNet()
-print(alex(torch.rand((2, 3, 224, 224))))
