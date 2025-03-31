@@ -1,7 +1,7 @@
 class FileFormatParser:
 
     @staticmethod
-    def parse_t15conll_file(file: str) -> list[tuple[str, list[str], list[str]]]:
+    def parse_t15conll_file(file: str) -> list[dict[str, list]]:
         """
         img_id, words, labels for each tweet
         """
@@ -12,7 +12,7 @@ class FileFormatParser:
             items = tweet.split("\n")
             img_id = FileFormatParser.__get_img_id(items[0])
             words, labels = FileFormatParser.__get_words_and_labels(items[1:])
-            result.append((img_id, words, labels))
+            result.append(FileFormatParser.__to_t17_json(img_id, words, labels))
         return result
 
     @staticmethod
@@ -29,3 +29,7 @@ class FileFormatParser:
     def __get_img_id(img_ref: str) -> str:
         assert img_ref.startswith("IMGID:")
         return img_ref[6:]
+
+    @staticmethod
+    def __to_t17_json(img_id, words, labels) -> dict[str, list]:
+        return {"image": [f"{img_id}.jpeg"], "text": words, "label": labels}

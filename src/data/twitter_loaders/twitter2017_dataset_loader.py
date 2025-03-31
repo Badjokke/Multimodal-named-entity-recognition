@@ -1,6 +1,6 @@
 import asyncio
 from concurrent.futures import Future
-from typing import Callable, Union, override
+from typing import Callable, Union
 
 import torch
 
@@ -19,7 +19,6 @@ class Twitter2017DatasetLoader(AbstractDatasetLoader):
         """
         super().__init__(input_path, text_processors, image_processors)
 
-    @override
     async def load_dataset(self) -> tuple:
         text_set, image_set = await asyncio.gather(self.__load_twitter_dataset_text(),
                                                    self.__load_twitter_dataset_image())

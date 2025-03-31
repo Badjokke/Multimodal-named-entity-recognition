@@ -29,8 +29,10 @@ async def save_file_consumer(queue: asyncio.Queue[tuple[str, bytes]]):
 
 
 async def save_file(path: str, content: bytes):
-    if not os.path.exists(path):
-        os.mkdir("/".join(path.split("/")[:-1]))
+    assert path is not None
+    dir_parent = "/".join(path.split("/")[:-1])
+    if not os.path.exists(dir_parent):
+        os.mkdir(dir_parent)
     async with aiofiles.open(path, 'wb') as f:
         await f.write(content)
 
