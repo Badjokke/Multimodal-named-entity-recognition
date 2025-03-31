@@ -1,5 +1,5 @@
 import torch
-from torchcrf import CRF
+#from torchcrf import CRF
 
 
 class CombinedModel(torch.nn.Module):
@@ -36,8 +36,8 @@ class CombinedModel(torch.nn.Module):
             num_layers=1,
             bidirectional=True,
             batch_first=True,
-        )
-        self.crf = CRF(num_labels, batch_first=True)
+            )
+        #self.crf = CRF(num_labels, batch_first=True)
 
     def forward(self, visual_feats, text_feats):
         visual_out = self.visual_model(visual_feats)
