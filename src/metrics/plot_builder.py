@@ -1,4 +1,4 @@
-from .plots import SimplePlot
+from metrics.simple_plot import SimplePlot
 
 
 
