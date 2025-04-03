@@ -4,7 +4,7 @@ import time
 import torch
 from huggingface_hub import login
 
-from data.twitter_loaders.twitter2017_dataset_loader import Twitter2017DatasetLoader
+from data.twitter_loaders.twitter2017_dataset_loader import JsonlDatasetLoader
 from data.twitter_preprocessors.twitter2015_preprocessor import Twitter2015Preprocessor
 from data.twitter_preprocessors.twitter2017_preprocessor import Twitter2017Preprocessor
 from model.configuration.quantization import create_default_quantization_config
@@ -15,12 +15,14 @@ from model.visual.convolutional_net import ConvNet
 from model.visual.vit_wrapper import ViT
 from security.token_manager import TokenManager
 from train import train
-
+from typing import Callable, Coroutine
+from data.dataset_analyzer import DatasetAnalyzer
+from metrics.plot_builder import PlotBuilder
 
 async def inference(model_path):
     model_name = "meta-llama/Llama-3.1-8B"
     print("Loading dataset")
-    t17_loader = Twitter2017DatasetLoader()
+    t17_loader = JsonlDatasetLoader()
     data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
     print("Dataset loaded")
     token_manager = TokenManager()
@@ -60,7 +62,7 @@ def merge_lora_layers_with_text_model(combined_model: CombinedModel) -> torch.nn
 
 
 async def create_vit_lstm_model():
-    t17_loader = Twitter2017DatasetLoader()
+    t17_loader = JsonlDatasetLoader()
     data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
     lstm = create_lstm(len(vocabulary.keys()))
     vit, processor = create_vit()
@@ -73,7 +75,7 @@ async def create_vit_lstm_model():
 async def llama_vit_multimodal():
     model_name = "meta-llama/Llama-3.1-8B"
     print("Loading dataset")
-    t17_loader = Twitter2017DatasetLoader()
+    t17_loader = JsonlDatasetLoader()
     data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
     print("Dataset loaded")
 
@@ -97,9 +99,29 @@ async def llama_vit_multimodal():
     torch.save(combined.state_dict(), MODEL_OUT_PATH)
     print("Leaving")
 
+async def analyze_dataset(dataset_loader:Callable[[], Coroutine]):
+    data, labels, class_occurrences, vocabulary = await dataset_loader()
+    analyzer = DatasetAnalyzer(data, class_occurrences, labels, vocabulary)
+    class_count = analyzer.get_dataset_label_count()
+    unique_token_count = analyzer.get_unique_token_count()
+    print(f"Class count: {class_count}")
+    bar = PlotBuilder.build_cake_plot(list(class_count.values()), list(class_count.keys()))
+    bar.plot()
+    bar.save("classes_t17.png")
+    print("==train==")
+    print(analyzer.get_train_subset_stats())
+    print("==val==")
+    print(analyzer.get_validation_subset_stats())
+    print("==test==")
+    print(analyzer.get_test_subset_stats())
+
 
 if __name__ == "__main__":
-    asyncio.run(preprocess_twitter15())
+    #asyncio.run(preprocess_twitter15())
+    asyncio.run(llama_vit_multimodal())
+    #asyncio.run(preprocess_twitter15())
+    t17_loader = JsonlDatasetLoader(lightweight=True)
+    asyncio.run(analyze_dataset(t17_loader.load_dataset))
     """
     random_input = torch.LongTensor([1, 2, 3, 4, 5, 6, 7])
     lstm = create_lstm(24)

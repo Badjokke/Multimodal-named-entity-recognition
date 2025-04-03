@@ -35,12 +35,14 @@ class Twitter2015Preprocessor(AbstractDatasetPreprocessor):
             file_wrapper = await que.get()
             if file_wrapper is None:
                 break
-            file_name = file_wrapper[0]
+            file_name = file_wrapper[0].split(".")[0]
             file_content = file_wrapper[1]
             parsed_conll = FileFormatParser.parse_t15conll_file(file_content.decode("utf-8"))
             json_processed = reduce(lambda old, new: f"{old}\n{new}",
                                     map(lambda cnl: self.__dict_to_json(cnl), parsed_conll))
-            await file_writer(f"{self.output_path}/text/{file_name}.json", json_processed.encode("utf-8"))
+            if file_name == "dev":
+                file_name = "val"
+            await file_writer(f"{self.output_path}/text_preprocessed/t15_{file_name}.txt", json_processed.encode("utf-8"))
 
     async def __load_twitter_image_dataset(self, save_file_consumer: Callable[[asyncio.Queue], Coroutine]):
         image_path = f"{self.input_path}/twitter2015_images"
@@ -55,11 +57,11 @@ class Twitter2015Preprocessor(AbstractDatasetPreprocessor):
             file_wrapper = await queue.get()
             if file_wrapper is None:
                 break
-            file_name = file_wrapper[0]
+            file_name = file_wrapper[0].split(".")[0]
             file_content = file_wrapper[1]
             result = self.image_processor.process_data(file_content)
             resized_image = result.result(2500)
-            processed_images_que.put_nowait((f"{self.output_path}/images/{file_name}.jpg", resized_image))
+            await processed_images_que.put((f"{self.output_path}/image_preprocessed/{file_name}.jpeg", resized_image))
         await processed_images_que.put(None)
 
     @staticmethod
