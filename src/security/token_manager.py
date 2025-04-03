@@ -1,6 +1,6 @@
 class TokenManager:
     def __init__(self):
-        self.__token_path = "../token"
+        self.__token_path = "token"
         self.__token = None
 
     def get_access_token(self) -> str:

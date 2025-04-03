@@ -4,11 +4,11 @@ import time
 import torch
 from huggingface_hub import login
 
-from data.twitter_loaders.twitter2017_dataset_loader import Twitter2017DatasetLoader
+from data.twitter_loaders.twitter2017_dataset_loader import JsonlDatasetLoader
 from data.twitter_preprocessors.twitter2015_preprocessor import Twitter2015Preprocessor
 from data.twitter_preprocessors.twitter2017_preprocessor import Twitter2017Preprocessor
 from model.configuration.quantization import create_default_quantization_config
-from model.model_factory import (create_llama_model, create_vit, create_lstm, create_bert_large)
+from model.model_factory import (create_llama_model, create_vit, create_lstm, create_bert_large, create_convolutional_net)
 from model.multimodal.text_image_model import CombinedModel
 from model.util import load_and_filter_state_dict
 from model.visual.convolutional_net import ConvNet
@@ -20,7 +20,7 @@ from train import train
 async def inference(model_path):
     model_name = "meta-llama/Llama-3.1-8B"
     print("Loading dataset")
-    t17_loader = Twitter2017DatasetLoader()
+    t17_loader = JsonlDatasetLoader()
     data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
     print("Dataset loaded")
     token_manager = TokenManager()
@@ -60,7 +60,7 @@ def merge_lora_layers_with_text_model(combined_model: CombinedModel) -> torch.nn
 
 
 async def create_vit_lstm_model():
-    t17_loader = Twitter2017DatasetLoader()
+    t17_loader = JsonlDatasetLoader()
     data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
     lstm = create_lstm(len(vocabulary.keys()))
     vit, processor = create_vit()
@@ -73,33 +73,37 @@ async def create_vit_lstm_model():
 async def llama_vit_multimodal():
     model_name = "meta-llama/Llama-3.1-8B"
     print("Loading dataset")
-    t17_loader = Twitter2017DatasetLoader()
+    token_manager = TokenManager()
+
+    login(token_manager.get_access_token())
+
+    t17_loader = JsonlDatasetLoader()
     data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
     print("Dataset loaded")
 
     # cnn((image[1]["0_0.jpg"][None,:,:,:])/255)
-    token_manager = TokenManager()
     login(token_manager.get_access_token())
     vit_model, vit_processor = create_vit()
     vit = ViT(vit_model, vit_processor)
     # cnn(torch.rand(3, 256, 256))
+    #cnn = create_convolutional_net()
     print("Creating vit llama model")
-    model, tokenizer = create_llama_model(model_name, create_default_quantization_config())
-    combined = CombinedModel(vit, create_bert_large(), len(labels.keys()))
+    model, tokenizer = create_bert_large()
+    combined = CombinedModel(vit, model, len(labels.keys()))
     print("Training combined model")
+
     combined = train.training_loop_combined(combined, data['train'], data["val"], data["test"], tokenizer,
                                             class_occurrences, labels,
                                             epochs=10)
     # combined.text_model = merge_lora_layers_with_text_model(combined)
     print("Saving model")
-    combined.save_pretrained("peft_finetuned_llama.pth")
-    MODEL_OUT_PATH = "./combined_model_roberta_vit.pth"
+    MODEL_OUT_PATH = "../models/bert/t15/cross_attention_bert_vit.pth"
     torch.save(combined.state_dict(), MODEL_OUT_PATH)
     print("Leaving")
 
 
 if __name__ == "__main__":
-    asyncio.run(preprocess_twitter15())
+    asyncio.run(llama_vit_multimodal())
     """
     random_input = torch.LongTensor([1, 2, 3, 4, 5, 6, 7])
     lstm = create_lstm(24)

@@ -11,7 +11,7 @@ from data.data_processors import image_to_tensor, parse_twitter_text
 
 
 class Twitter2017DatasetLoader(AbstractDatasetLoader):
-    def __init__(self, input_path: str = "../dataset/preprocessed/twitter_2017",
+    def __init__(self, input_path: str = "dataset/preprocessed/twitter_2017",
                  text_processors: list[DataProcessor] = None, image_processors: list[DataProcessor] = None):
         """
         class is responsible for loading twitter 2017 in it's raw form - jsonl files and jpges

@@ -3,7 +3,7 @@ from typing import Iterable, Union
 import numpy as np
 import torch
 from peft import PeftModel
-from seqeval.metrics import classification_report
+#from seqeval.metrics import classification_report
 from sklearn.utils.class_weight import compute_class_weight
 from torch.utils.data import DataLoader
 from transformers import get_linear_schedule_with_warmup
@@ -194,8 +194,8 @@ def training_loop_combined(model: Union[torch.nn.Module, PeftModel], train_data,
     #scheduler = create_cosine_scheduler(optimizer, epochs * len(train_data))
     #scheduler = create_cyclic_scheduler(optimizer)
     #scheduler = _create_scheduler(optimizer, epochs * len(train_data))
-    #scheduler = create_plateau_scheduler(optimizer)
-    scheduler = _create_warm_cosine_scheduler(optimizer)
+    scheduler = create_plateau_scheduler(optimizer)
+    #scheduler = _create_warm_cosine_scheduler(optimizer)
     #scheduler = create_linear_scheduler(optimizer,epochs * len(train_data), len(train_data) * 0.1)
     w = _compute_class_weights_rare_events(class_occurrences)
     res = []
@@ -214,7 +214,7 @@ def training_loop_combined(model: Union[torch.nn.Module, PeftModel], train_data,
         #print("==TEST==")
         test_results = validate_after_epoch(model, tokenizer, loss_criterion, test_data,
                                             {value: key for key, value in labels.items()}, w)
-        #scheduler.step(val_loss[1]['macro'])
+        scheduler.step(val_loss[1]['macro'])
 
         print(f"[epoch: {epoch + 1}] Training loss: {training_loss[0]}. Training macro f1: {training_loss[1]['macro']}; micro f1: {training_loss[1]['micro']}, acc: {training_loss[1]['accuracy']}")
         print(f"[epoch: {epoch + 1}] Validation loss: {val_loss[0]}. Validation macro f1: {val_loss[1]['macro']}; micro f1: {val_loss[1]['micro']}, acc: {val_loss[1]['accuracy']}")
@@ -272,7 +272,7 @@ def perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, sched
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         loss.backward()
         optimizer.step()
-        scheduler.step()
+        #scheduler.step()
 
         #y_pred.append(decode_labels_majority_vote(word_ids[1:-1],model.crf_decode(outputs, mask)).tolist())
         #y_pred.append(torch.argmax(outputs, dim=-1).tolist())
