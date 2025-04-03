@@ -73,12 +73,12 @@ def _create_adamw_optimizer(model, learning_rate=1e-5) -> torch.optim.AdamW:
         {
             'params': [p for n, p in vit_params if not any(nd in n for nd in no_decay)],
             'weight_decay': 0.01,
-            'lr': 3e-5  # Increased from 1e-5
+            'lr': 8e-5  # Increased from 1e-5
         },
         {
             'params': [p for n, p in vit_params if any(nd in n for nd in no_decay)],
             'weight_decay': 0.0,
-            'lr': 3e-5
+            'lr': 8e-5
         },
         # Fusion layer - critical for performance
         {
@@ -95,12 +95,12 @@ def _create_adamw_optimizer(model, learning_rate=1e-5) -> torch.optim.AdamW:
         {
             'params': [p for n, p in bilstm_params if not any(nd in n for nd in no_decay)],
             'weight_decay': 0.01,
-            'lr': 5e-4  # Modified learning rate
+            'lr': 3e-4  # Modified learning rate
         },
         {
             'params': [p for n, p in bilstm_params if any(nd in n for nd in no_decay)],
             'weight_decay': 0.0,
-            'lr': 5e-4
+            'lr': 3e-4
         },
         # CRF parameters
         {
@@ -112,12 +112,12 @@ def _create_adamw_optimizer(model, learning_rate=1e-5) -> torch.optim.AdamW:
         {
             'params': [p for n, p in other_params if not any(nd in n for nd in no_decay)],
             'weight_decay': 0.01,
-            'lr': 2e-5
+            'lr': 1e-5
         },
         {
             'params': [p for n, p in other_params if any(nd in n for nd in no_decay)],
             'weight_decay': 0.0,
-            'lr': 2e-5
+            'lr': 1e-5
         }
     ]
     # Use a lower epsilon for better handling of small gradients
@@ -196,7 +196,7 @@ def training_loop_combined(model: Union[torch.nn.Module, PeftModel], train_data,
     #scheduler = _create_scheduler(optimizer, epochs * len(train_data))
     scheduler = create_plateau_scheduler(optimizer)
     #scheduler = _create_warm_cosine_scheduler(optimizer)
-    #scheduler = create_linear_scheduler(optimizer,epochs * len(train_data), len(train_data) * 0.1)
+    #scheduler = create_linear_scheduler(optimizer,epochs * len(train_data), len(train_data) * 0.3)
     w = _compute_class_weights_rare_events(class_occurrences)
     res = []
     # optimizer, scheduler = setup_optimizer(model, t_max=epochs*len(train_data))
