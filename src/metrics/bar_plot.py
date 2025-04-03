@@ -1,9 +1,8 @@
 import matplotlib.pyplot as plt
-import numpy as np
 
 
 class PieChart:
-    def __init__(self, data: list[float], labels: list[str], x_label: str = "class label", y_label: str= "class occurrence", plot_label: str = "class distribution"):
+    def __init__(self, data: list[float], labels: list[str], x_label: str = "Class", y_label: str= "Class count", plot_label: str = "T15 distribution"):
         assert len(data) == len(labels), "data and label count must be the same"
         self.data = data
         self.labels = labels

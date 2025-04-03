@@ -22,7 +22,7 @@ class PlotBuilder:
         return SimplePlot(x, y, **kwargs)
 
     @staticmethod
-    def build_cake_plot(data: list[Union[float,int]], labels: list[str], **kwargs) -> PieChart:
+    def build_cake_plot(x: list[Union[float,int]], y: list[str], x_label: str = "Class", y_label: str= "Class count", plot_label: str = "T15 distribution") -> PieChart:
         """
         kwargs:
             x_axis_label: str = x-axis label
@@ -32,4 +32,4 @@ class PlotBuilder:
             colors: list[str] = colors of different lines passed in x matrix
             fig_size: tuple = (width, height) of the figure
         """
-        return PieChart(data, labels,**kwargs)
+        return PieChart(x, y, x_label=x_label, y_label=y_label, plot_label=plot_label)
