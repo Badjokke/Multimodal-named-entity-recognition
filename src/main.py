@@ -91,13 +91,12 @@ async def llama_vit_multimodal():
     model, tokenizer = create_bert_large()
     combined = CombinedModel(vit, model, len(labels.keys()))
     print("Training combined model")
-
     combined = train.training_loop_combined(combined, data['train'], data["val"], data["test"], tokenizer,
                                             class_occurrences, labels,
-                                            epochs=10)
+                                            epochs=15)
     # combined.text_model = merge_lora_layers_with_text_model(combined)
     print("Saving model")
-    MODEL_OUT_PATH = "../models/bert/t15/cross_attention_bert_vit.pth"
+    MODEL_OUT_PATH = "../models/bert/t17/cross_attention_bert_vit.pth"
     torch.save(combined.state_dict(), MODEL_OUT_PATH)
     print("Leaving")
 

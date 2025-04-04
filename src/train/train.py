@@ -199,6 +199,10 @@ def training_loop_combined(model: Union[torch.nn.Module, PeftModel], train_data,
     #scheduler = create_linear_scheduler(optimizer,epochs * len(train_data), len(train_data) * 0.3)
     w = _compute_class_weights_rare_events(class_occurrences)
     res = []
+    model.eval()
+    test_results = validate_after_epoch(model, tokenizer, loss_criterion, test_data,
+                                        {value: key for key, value in labels.items()}, w)
+    print(f"[before training] Test loss: {test_results[0]}. Test macro f1: {test_results[1]['macro']}; micro f1: {test_results[1]['micro']}, acc: {test_results[1]['accuracy']}")
     # optimizer, scheduler = setup_optimizer(model, t_max=epochs*len(train_data))
     for epoch in range(epochs):
         #print(f"==EPOCH {epoch}==")
