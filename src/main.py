@@ -7,13 +7,14 @@ from huggingface_hub import login
 from data.twitter_loaders.twitter2017_dataset_loader import JsonlDatasetLoader
 from data.twitter_preprocessors.twitter2015_preprocessor import Twitter2015Preprocessor
 from data.twitter_preprocessors.twitter2017_preprocessor import Twitter2017Preprocessor
-from model.configuration.quantization import create_default_quantization_config
+from model.configuration.quantization import create_default_quantization_config, create_parameter_efficient_model
 from model.model_factory import (create_llama_model, create_vit, create_lstm, create_bert_large, create_convolutional_net)
-from model.multimodal.text_image_model import CombinedModel
+from model.multimodal.CrossAttentionMultimodalModel import CrossAttentionModel
 from model.util import load_and_filter_state_dict
-from model.visual.convolutional_net import ConvNet
-from model.visual.vit_wrapper import ViT
+from model.visual.AlexNetCNN import ConvNet
+from model.visual.ViTWrapper import ViT
 from security.token_manager import TokenManager
+from data.text_data_processor.stemming_json_data_processor import StemmingTextDataProcessor
 from train import train
 
 
@@ -28,7 +29,7 @@ async def inference(model_path):
     cnn = ConvNet()
     print("Creating model")
     model, tokenizer = create_llama_model(model_name, create_default_quantization_config())
-    combined = CombinedModel(cnn, model, len(labels.keys()))
+    combined = CrossAttentionModel(cnn, model, len(labels.keys()))
 
     state_dict = load_and_filter_state_dict(model_path)
     combined.load_state_dict(state_dict)
@@ -55,19 +56,24 @@ async def preprocess_twitter15():
     print(f"Loading took: {(end - start) * 1000} ms")
 
 
-def merge_lora_layers_with_text_model(combined_model: CombinedModel) -> torch.nn.Module:
+def merge_lora_layers_with_text_model(combined_model: CrossAttentionModel) -> torch.nn.Module:
     return combined_model.text_model.merge_and_unload()
 
 
 async def create_vit_lstm_model():
-    t17_loader = JsonlDatasetLoader()
+    t17_loader = JsonlDatasetLoader(text_processors=[StemmingTextDataProcessor()])
     data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
-    lstm = create_lstm(len(vocabulary.keys()))
+    lstm = create_lstm(vocabulary)
     vit, processor = create_vit()
     vit = ViT(vit, processor)
-    combined = CombinedModel(vit, lstm, len(labels.keys()))
-    combined = train.training_loop_combined(combined, data["train"], data["val"], data["test"], None, vocabulary,
-                                            class_occurrences)
+    combined = CrossAttentionModel(vit, lstm, len(labels.keys()))
+    combined = train.training_loop_combined(combined, data['train'], data["val"], data["test"], None,
+                                            class_occurrences, labels,
+                                            epochs=20)
+    # combined.text_model = merge_lora_layers_with_text_model(combined)
+    print("Saving model lstm_vit_crossattention")
+    MODEL_OUT_PATH = "../models/lstm/t17/lstm_vit_crossattention.pth"
+    torch.save(combined.state_dict(), MODEL_OUT_PATH)
 
 
 async def llama_vit_multimodal():
@@ -89,20 +95,22 @@ async def llama_vit_multimodal():
     #cnn = create_convolutional_net()
     print("Creating vit llama model")
     model, tokenizer = create_bert_large()
-    combined = CombinedModel(vit, model, len(labels.keys()))
+    #model,tokenizer = create_llama_model(model_name, create_default_quantization_config())
+    #model = create_lstm(len(vocabulary.keys()), True)
+    combined = CrossAttentionModel(vit, model, len(labels.keys()))
     print("Training combined model")
     combined = train.training_loop_combined(combined, data['train'], data["val"], data["test"], tokenizer,
                                             class_occurrences, labels,
                                             epochs=15)
     # combined.text_model = merge_lora_layers_with_text_model(combined)
     print("Saving model")
-    MODEL_OUT_PATH = "../models/bert/t17/cross_attention_bert_vit.pth"
+    MODEL_OUT_PATH = "../models/bert/t32/cross_attention_bert_vit.pth"
     torch.save(combined.state_dict(), MODEL_OUT_PATH)
     print("Leaving")
 
 
 if __name__ == "__main__":
-    asyncio.run(llama_vit_multimodal())
+    asyncio.run(create_vit_lstm_model())
     """
     random_input = torch.LongTensor([1, 2, 3, 4, 5, 6, 7])
     lstm = create_lstm(24)

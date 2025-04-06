@@ -199,10 +199,8 @@ def training_loop_combined(model: Union[torch.nn.Module, PeftModel], train_data,
     #scheduler = create_linear_scheduler(optimizer,epochs * len(train_data), len(train_data) * 0.3)
     w = _compute_class_weights_rare_events(class_occurrences)
     res = []
-    model.eval()
-    test_results = validate_after_epoch(model, tokenizer, loss_criterion, test_data,
-                                        {value: key for key, value in labels.items()}, w)
-    print(f"[before training] Test loss: {test_results[0]}. Test macro f1: {test_results[1]['macro']}; micro f1: {test_results[1]['micro']}, acc: {test_results[1]['accuracy']}")
+    validate_after_epoch(model, tokenizer, loss_criterion, test_data,
+                         {value: key for key, value in labels.items()}, w)
     # optimizer, scheduler = setup_optimizer(model, t_max=epochs*len(train_data))
     for epoch in range(epochs):
         #print(f"==EPOCH {epoch}==")
@@ -253,20 +251,20 @@ def perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, sched
     y_true = []
     for i in range(len(train_data)):
         data_sample = train_data[i]
-        images, labels, text = data_sample[1].to(device), torch.tensor(data_sample[2], dtype=torch.long,device=device), tokenizer(data_sample[0], is_split_into_words=True, return_tensors="pt").to(device)
+        text = tokenizer(data_sample[0], return_tensors="pt", is_split_into_words=True) if tokenizer is not None else data_sample[0]
+        images, labels = data_sample[1].to(device), torch.tensor(data_sample[2], dtype=torch.long,device=device)
         #if not contains_entity(labels):
         #   continue
-        word_ids = text.word_ids()
-        text = {key: value.to(device) for key, value in text.items()}
+        #word_ids = text.word_ids()
+        #text = {key: value.to(device) for key, value in text.items()}
 
         optimizer.zero_grad()
 
-        aligned_labels = torch.tensor(align_labels(word_ids, labels), device=device, dtype=torch.long).unsqueeze(0).repeat(images.size(0), 1)
-        #labels = labels.repeat(images.size(0), 1)
+        aligned_labels = labels.unsqueeze(0).repeat(images.size(0), 1) #torch.tensor(align_labels(word_ids, labels), device=device, dtype=torch.long).unsqueeze(0).repeat(images.size(0), 1)
         outputs = model(images, text)
 
-        aligned_labels = aligned_labels[0:, 1:-1]
-        outputs = outputs[0:, 1:-1]
+        #aligned_labels = aligned_labels[0:, 1:-1]
+        #outputs = outputs[0:, 1:-1]
         mask = torch.ones_like(aligned_labels, device=device).bool()
 
         loss = model.crf_pass(outputs, aligned_labels, mask, w)
@@ -284,29 +282,6 @@ def perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, sched
         y_true.append(aligned_labels.tolist())
         y_pred.append(model.crf_decode(outputs, mask))
 
-        """        
-        if base_label_mapping["ORG"] not in y_tr_mapped[0] and base_label_mapping["MIS"] not in y_tr_mapped[0]:
-            continue
-
-        outputs = model(images, text)
-        outputs = outputs[0:, 1:-1]
-        loss = model.crf_pass(outputs, aligned_labels, mask, w)
-        running_loss += loss.item()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-        loss.backward()
-        optimizer.step()
-        y_pred.append(map_to_base_labels(model.crf_decode(outputs, mask), labels_mapping))
-        y_true.append(y_tr_mapped)
-        """
-
-
-        """
-        for prediction in list(
-                map(lambda x: list(map(lambda y: labels_mapping[int(y)], x)), model.crf_decode(outputs,mask))):
-            y_pred.append(prediction)
-        for y_tr in list(map(lambda batch: list(map(lambda item: labels_mapping[int(item)], batch)), aligned_labels)):
-            y_true.append(y_tr)
-        """
     metrics = Metrics(y_pred, y_true, len(labels_mapping.keys()), labels_mapping)
     macro_f1 = metrics.macro_f1(metrics.confusion_matrix())
     micro_f1 = metrics.micro_f1(metrics.confusion_matrix())
@@ -320,24 +295,27 @@ def perform_epoch(model, tokenizer, train_data, loss_criterion, optimizer, sched
 def validate_after_epoch(model, tokenizer, loss_criterion, validation_data, labels_mapping, w) -> tuple[
     float, dict[str, float]]:
     model.eval()
-    model.to(device)
+    #model.to(device)
     running_loss = 0.
     y_true, y_pred = [], []
     with torch.no_grad():
         for i in range(len(validation_data)):
             data_sample = validation_data[i]
-            images, labels, text = data_sample[1].to(device), torch.tensor(data_sample[2], dtype=torch.long, device=device), tokenizer(data_sample[0],is_split_into_words=True,return_tensors="pt").to(device)
+            text = tokenizer(data_sample[0], return_tensors="pt",
+                             is_split_into_words=True) if tokenizer is not None else data_sample[0]
 
-            word_ids = text.word_ids()
+            images, labels = data_sample[1].to(device), torch.tensor(data_sample[2], dtype=torch.long, device=device)
 
-            aligned_labels = torch.tensor(align_labels(word_ids, labels), device=device, dtype=torch.long).unsqueeze(0).repeat(images.size(0), 1)
-            text = {key: value.to(device) for key, value in text.items()}
+            #word_ids = text.word_ids()
+
+            aligned_labels = labels.unsqueeze(0).repeat(images.size(0), 1)
+            #text = {key: value.to(device) for key, value in text.items()}
             #labels = labels.repeat(images.size(0), 1)
 
             outputs = model(images, text)
-            aligned_labels = aligned_labels[0:, 1:-1]
+            #aligned_labels = aligned_labels[0:, 1:-1]
 
-            outputs = outputs[0:, 1:-1]
+            #outputs = outputs[0:, 1:-1]
             mask = torch.ones_like(aligned_labels, device=device).bool()
             loss = model.crf_pass(outputs, aligned_labels, mask, w)
             #loss = loss_criterion(torch.permute(outputs, (0, 2, 1)), labels)
