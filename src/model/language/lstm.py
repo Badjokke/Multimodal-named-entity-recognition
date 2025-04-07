@@ -14,7 +14,6 @@ class LSTM(nn.Module):
         self.lstm = nn.LSTM(self.embedding_size, self.hidden_size, num_layers=3, dropout=0.3, bidirectional=bidirectional, batch_first=True, )
         self.layer_norm = nn.LayerNorm(self.hidden_size * 2)
         self.dropout = nn.Dropout(0.3)
-        self.text_attention = torch.nn.MultiheadAttention(self.hidden_size * 2 if bidirectional else self.hidden_size, num_heads=4)
 
     class Configuration:
         def __init__(self, vocab_size, hidden_size, embedding_size, bidirectional):
@@ -27,5 +26,4 @@ class LSTM(nn.Module):
         text_features = self.tokenizer(text_features)
         x = self.embedding(text_features)
         x, (hidden, cell) = self.lstm(x)
-        #attended, _ = self.text_attention(x, x, x)
         return self.dropout(self.layer_norm(x))
