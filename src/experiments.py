@@ -65,27 +65,48 @@ async def analyze_dataset(dataset_loader: Callable[[], Coroutine]):
                                       plot_label="T17 test set")
     bar.plot()
 
-async def multimodal_pipeline(model_save_directory: str):
-    print("Running multimodal pipeline")
+async def multimodal_pipeline_t17(model_save_directory: str):
+    print("Running T17 multimodal pipeline")
     t17_loader = JsonlDatasetLoader()
     data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
 
     bert_vit, tokenizer = ModelFactory.create_bert_vit_attention_classifier(len(labels.keys()))
     print("Training bert+vit")
     combined, results, state_dict = train.multimodal_training(bert_vit, data['train'], data["val"], data["test"], tokenizer,
-                                                  class_occurrences, labels, epochs=10, patience=2)
-    plot_model_training(results, f"{model_save_directory}/bert/t17/fig/plot.png")
+                                                  class_occurrences, labels, epochs=15, patience=2)
+    plot_model_training(results, f"{model_save_directory}/bert/t17/fig/plot.png", "Multimodal Cross Attention BERT with CRF")
     save(state_dict, model_save_directory + "/bert_vit_cross_attention.pth")
     print()
     print("Training llama+vit")
     llama, llama_tokenizer = ModelFactory.create_llama_vit_attention_classifier(len(labels.keys()))
     combined, results, state_dict = train.multimodal_training(create_parameter_efficient_model(llama), data['train'], data["val"], data["test"], llama_tokenizer,
-                                                  class_occurrences, labels, epochs=10, patience=2)
-    plot_model_training(results, f"{model_save_directory}/llama/t17/fig/plot.png")
+                                                  class_occurrences, labels, epochs=15, patience=2)
+    plot_model_training(results, f"{model_save_directory}/llama/t17/fig/plot.png", "Multimodal Cross Attention Llama with CRF")
+    save(state_dict, model_save_directory + "/llama_vit_cross_attention_peft.pth")
+    print()
+
+async def multimodal_pipeline_t15(model_save_directory: str):
+    print("Running T15 multimodal pipeline")
+    t17_loader = JsonlDatasetLoader(input_path="../dataset/preprocessed/twitter_2015")
+    data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
+
+    bert_vit, tokenizer = ModelFactory.create_bert_vit_attention_classifier(len(labels.keys()))
+    print("Training bert+vit")
+    combined, results, state_dict = train.multimodal_training(bert_vit, data['train'], data["val"], data["test"],
+                                                              tokenizer,
+                                                              class_occurrences, labels, epochs=10, patience=2)
+    plot_model_training(results, f"{model_save_directory}/bert/t15/fig/plot.png", "Multimodal Cross Attention BERT with CRF")
+    save(state_dict, model_save_directory + "/bert_vit_cross_attention.pth")
+    print()
+    print("Training llama+vit")
+    llama, llama_tokenizer = ModelFactory.create_llama_vit_attention_classifier(len(labels.keys()))
+    combined, results, state_dict = train.multimodal_training(create_parameter_efficient_model(llama), data['train'],
+                                                              data["val"], data["test"], llama_tokenizer,
+                                                              class_occurrences, labels, epochs=10, patience=2)
+    plot_model_training(results, f"{model_save_directory}/llama/t15/fig/plot.png", "Multimodal Cross Attention Llama with CRF")
     save(state_dict, model_save_directory + "/llama_vit_cross_attention_peft.pth")
     print()
     print("Leaving")
-
 
 if __name__ == "__main__":
     token_manager = TokenManager()
@@ -94,7 +115,8 @@ if __name__ == "__main__":
     # asyncio.run(llama_vit_multimodal())
     # asyncio.run(preprocess_twitter15())
     # t17_loader = JsonlDatasetLoader(lightweight=True)
-    asyncio.run(multimodal_pipeline("../models"))
+    asyncio.run(multimodal_pipeline_t17("../models"))
+    asyncio.run(multimodal_pipeline_t15("../models"))
     """
     random_input = torch.LongTensor([1, 2, 3, 4, 5, 6, 7])
     lstm = create_lstm(24)

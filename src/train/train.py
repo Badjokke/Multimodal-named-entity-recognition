@@ -34,7 +34,7 @@ def multimodal_training(model: Union[torch.nn.Module, PeftModel], train_data, va
     max_early_stop = TrainingUtil.create_maximizing_early_stop(patience=patience)
     best_state_dict = None
     training_results = []
-    for epoch in range(3):
+    for epoch in range(epochs):
         training_loss = perform_epoch(model, tokenizer, train_data, optimizer, {value: key for key, value in labels.items()}, w)
         val_loss = validate_after_epoch(model, tokenizer,  validation_data, {value: key for key, value in labels.items()}, w)
         test_results = validate_after_epoch(model, tokenizer, test_data, {value: key for key, value in labels.items()}, w)
@@ -94,7 +94,7 @@ def perform_epoch(model, tokenizer, train_data, optimizer, labels_mapping, w, sc
     running_loss = 0.0
     y_pred = []
     y_true = []
-    for i in range(100):
+    for i in range(len(train_data)):
         data_sample = train_data[i]
         text = tokenizer(data_sample[0], return_tensors="pt", is_split_into_words=True).to(device) if tokenizer is not None else data_sample[0]
         images, labels = data_sample[1].to(device), torch.tensor(data_sample[2], dtype=torch.long,device=device)
