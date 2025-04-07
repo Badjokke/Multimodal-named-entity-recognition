@@ -16,7 +16,7 @@ class Twitter2015Preprocessor(AbstractDatasetPreprocessor):
         self.output_path = output_path
         self.image_processor = ResizingDataProcessor()
         #maps to t17 classes
-        self.label_processor = LabelMappingProcessor({"I-OTHER": "I-MISC", "B-OTHER": "B-MISC"})
+        self.label_processor = LabelMappingProcessor({"I-OTHER": "I-MIS", "B-OTHER": "B-MIS"})
 
     async def load_and_transform_dataset(self):
         text_task = asyncio.create_task(self.__load_twitter15_text_dataset(filesystem.save_file))
