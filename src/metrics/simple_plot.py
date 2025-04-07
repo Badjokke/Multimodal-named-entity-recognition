@@ -1,8 +1,10 @@
 import matplotlib.pyplot as plt
 
+
 class SimplePlot:
-    def __init__(self, x: list[list[float]], y: list[list[float]], x_axis_label: str=None, y_axis_label: str=None, plot_title: str=None,
-                 labels:list[str]=[], colors:list[str]=[], fig_size: (int, int)=()):
+    def __init__(self, x: list[list[float]], y: list[list[float]], x_axis_label: str = None, y_axis_label: str = None,
+                 plot_title: str = None,
+                 labels: list[str] = [], colors: list[str] = [], fig_size: (int, int) = ()):
         self.x = x
         self.y = y
         self.x_axis_label = x_axis_label
@@ -11,8 +13,7 @@ class SimplePlot:
         self.labels = labels
         self.colors = colors
         self.fig_size = fig_size
-        self.__default_colors = ["blue","green","red","black"]
-
+        self.__default_colors = ["blue", "green", "red", "black"]
 
     def plot(self) -> None:
         assert len(self.x) == len(self.y), f"x and y must have same length. Received {len(self.x)}, {len(self.y)}"
@@ -24,17 +25,25 @@ class SimplePlot:
         plt.xlim(xmin=0)
         plt.xticks(self.x[0])
         plt.legend(loc="best")
+
+    @staticmethod
+    def show():
         plt.show()
+
+    @staticmethod
+    def save(path: str) -> None:
+        plt.savefig(path, bbox_inches='tight')
 
     def __plot_data(self):
         for i in range(len(self.x)):
             plt.plot(self.x[i], self.y[i], label=self.__get_line_label(i), color=self.__get_line_color(i))
 
     def __get_line_label(self, index: int) -> str:
-        return f"line_{index+1}" if index >= len(self.labels) else self.labels[index]
+        return f"line_{index + 1}" if index >= len(self.labels) else self.labels[index]
 
     def __get_line_color(self, index: int) -> str:
-        return self.__default_colors[index % len(self.__default_colors)] if index >= len(self.colors) else self.colors[index]
+        return self.__default_colors[index % len(self.__default_colors)] if index >= len(self.colors) else self.colors[
+            index]
 
     def __get_plot_title(self) -> str:
         return "Very cool plot of very cool things" if self.plot_title is None else self.plot_title
@@ -45,5 +54,5 @@ class SimplePlot:
     def __get_y_axis_label(self) -> str:
         return "y-axis" if self.y_axis_label is None else self.y_axis_label
 
-    def __get_fig_size(self)->tuple[int, int]:
-        return (800,800) if self.fig_size is not None else self.fig_size
+    def __get_fig_size(self) -> tuple[int, int]:
+        return (800, 800) if self.fig_size is not None else self.fig_size

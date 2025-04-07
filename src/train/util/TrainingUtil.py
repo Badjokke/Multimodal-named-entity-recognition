@@ -1,10 +1,16 @@
 import torch
 import numpy as np
 from sklearn.utils.class_weight import compute_class_weight
+from train.util.MaximazingEarlyStop import MaximizingEarlyStop
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
 class TrainingUtil:
-    base_label_mapping = { "O": 0, "LOC": 1, "PER": 2, "MIS": 3, "ORG": 4 }
+    base_label_mapping = {"O": 0, "LOC": 1, "PER": 2, "MIS": 3, "ORG": 4}
+
+    @staticmethod
+    def create_cross_entropy_loss_criterion(y) -> torch.nn.CrossEntropyLoss:
+        return torch.nn.CrossEntropyLoss(ignore_index=-100, weight=TrainingUtil.compute_class_weights_rare_events(y))
 
     @staticmethod
     def map_to_base_labels(y, labels_mapping):
@@ -72,3 +78,7 @@ class TrainingUtil:
             decoded_labels.append(TrainingUtil.most_common(current_word_labels))
             batched_decoded_labels.append(torch.tensor(decoded_labels, dtype=torch.long, device=device))
         return torch.stack(batched_decoded_labels)
+
+    @staticmethod
+    def create_maximizing_early_stop(patience):
+        return MaximizingEarlyStop(patience)

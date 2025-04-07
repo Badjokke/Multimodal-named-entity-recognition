@@ -1,13 +1,13 @@
-import torch
 from typing import Iterable
+
+import torch
+from torch.optim.lr_scheduler import ReduceLROnPlateau, CyclicLR, OneCycleLR
 from transformers import get_linear_schedule_with_warmup, get_cosine_schedule_with_warmup
 
-from torch.optim.lr_scheduler import ReduceLROnPlateau, CyclicLR, OneCycleLR
 class OptimizerFactory:
-
     @staticmethod
     def create_sgd_optimizer_with_nesterov_momentum(parameters: Iterable[torch.Tensor], learning_rate=2e-5,
-                          momentum=0.9) -> torch.optim.Optimizer:
+                                                    momentum=0.9) -> torch.optim.Optimizer:
         return torch.optim.SGD(parameters, lr=learning_rate, momentum=momentum, nesterov=True, weight_decay=0.0001)
 
     @staticmethod
@@ -114,6 +114,7 @@ class OptimizerFactory:
             num_warmup_steps=int(training_steps * 0.15),  # 15% warmup
             num_training_steps=training_steps
         )
+
     @staticmethod
     def create_plateau_scheduler(optimizer):
         return ReduceLROnPlateau(optimizer, 'max', patience=1, threshold=0.01)
