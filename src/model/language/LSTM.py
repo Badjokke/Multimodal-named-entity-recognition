@@ -1,6 +1,5 @@
-import torch.nn
 import torch.nn as nn
-from model.language.lstm_tokenizer import LstmTokenizer
+from model.language.LstmTokenizer import LstmTokenizer
 class LSTM(nn.Module):
     def __init__(self, vocab, bidirectional):
         super(LSTM, self).__init__()
