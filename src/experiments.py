@@ -1,7 +1,7 @@
 import asyncio
 import time
 from typing import Callable, Coroutine
-
+from torch import save
 from huggingface_hub import login
 
 from data.dataset_analyzer import DatasetAnalyzer
@@ -74,6 +74,7 @@ async def multimodal_pipeline(model_save_directory: str):
     combined, results = train.multimodal_training(bert_vit, data['train'], data["val"], data["test"], tokenizer,
                                                   class_occurrences, labels, epochs=10, patience=2)
     plot_model_training(results, f"{model_save_directory}/fig/plot.png")
+    save(combined.state_dict(), model_save_directory + "/bert_vit_cross_attention.pth")
     """
     torch.save(combined.state_dict(), model_save_directory + "/bert_vit_cross_attention.pth")
     llama_vit, tokenizer = ModelFactory.create_llama_vit_attention_classifier(len(labels.keys()))
