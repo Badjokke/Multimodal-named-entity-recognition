@@ -1,9 +1,12 @@
 from typing import Union
-from train.util.TrainingUtil import TrainingUtil
+
 import torch
 from peft import PeftModel
-from train.optimizer.OptimizerFactory import OptimizerFactory
+
 from metrics.metrics import Metrics
+from train.optimizer.OptimizerFactory import OptimizerFactory
+from train.util.EarlyStop import StepState
+from train.util.TrainingUtil import TrainingUtil
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -28,6 +31,8 @@ def multimodal_training(model: Union[torch.nn.Module, PeftModel], train_data, va
     optimizer = OptimizerFactory.create_adamw_optimizer(model)
     scheduler = OptimizerFactory.create_plateau_scheduler(optimizer)
     w = TrainingUtil.compute_class_weights_rare_events(class_occurrences)
+    max_early_stop = TrainingUtil.create_maximizing_early_stop(patience=patience)
+    best_state_dict = None
     training_results = []
     for epoch in range(epochs):
         training_loss = perform_epoch(model, tokenizer, train_data, optimizer, scheduler, {value: key for key, value in labels.items()}, w)
@@ -38,7 +43,14 @@ def multimodal_training(model: Union[torch.nn.Module, PeftModel], train_data, va
         print(f"[epoch: {epoch + 1}] Validation loss: {val_loss[0]}. Validation macro f1: {val_loss[1]['macro']}; micro f1: {val_loss[1]['micro']}, acc: {val_loss[1]['accuracy']}")
         print(f"[epoch: {epoch + 1}] Test loss: {test_results[0]}. Test macro f1: {test_results[1]['macro']}; micro f1: {test_results[1]['micro']}, acc: {test_results[1]['accuracy']}")
         training_results.append({"train":training_loss, "validation": val_loss, "test":test_results})
-    return model, training_results
+
+        state = max_early_stop.verify(val_loss[1]['macro'])
+        if state == StepState.STOP:
+            print("Early stopping")
+            break
+        if state == StepState.BETTER:
+            best_state_dict = model.state_dict()
+        return model, training_results, best_state_dict
 
 def text_only_training(model: Union[torch.nn.Module, PeftModel], train_data, validation_data, test_data, tokenizer,
                        class_occurrences, labels, epochs=10, patience=3):

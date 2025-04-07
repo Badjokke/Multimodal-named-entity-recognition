@@ -1,5 +1,9 @@
 from abc import ABC, abstractmethod
-
+from enum import Enum
+class StepState(Enum):
+    BETTER = 0,
+    WORSE = 1,
+    STOP = 2
 class EarlyStop(ABC):
     def __init__(self, patience):
         self.last_val = None
@@ -7,10 +11,5 @@ class EarlyStop(ABC):
         self.counter = 0
 
     @abstractmethod
-    def verify(self, value) -> bool:
+    def verify(self, value) -> StepState:
         raise NotImplementedError("Cannot invoke abstract method directly")
-
-    def stop(self) -> bool:
-        if self.counter == self.patience:
-            return True
-        return False
