@@ -3,7 +3,7 @@ from transformers import AutoTokenizer, LlamaModel, LlamaForCausalLM, \
     ViTImageProcessor, ViTModel, MistralModel, BertTokenizerFast, BertModel, AutoImageProcessor, ResNetForImageClassification
 
 from model.language.lstm import LSTM
-from model.visual.convolutional_net import ConvNet
+from model.visual.AlexNetCNN import ConvNet
 
 
 def create_vit():
@@ -21,8 +21,8 @@ def create_convolutional_net():
     return ConvNet()
 
 
-def create_lstm(vocab_size, bidirectional=True):
-    return LSTM(vocab_size, bidirectional)
+def create_lstm(vocab, bidirectional=True):
+    return LSTM(vocab, bidirectional)
 
 
 def create_bert_large():

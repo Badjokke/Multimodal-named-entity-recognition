@@ -1,8 +1,8 @@
 import torch
-#from torchcrf import CRF
+from torchcrf import CRF
 
 
-class CombinedModel(torch.nn.Module):
+class LinearFusionMultimodalModel(torch.nn.Module):
     def __init__(self, visual_model, text_model, num_labels):
         super().__init__()
         self.visual_model = visual_model
@@ -22,12 +22,10 @@ class CombinedModel(torch.nn.Module):
         )
         self.projection_layer = torch.nn.Sequential(
             torch.nn.Linear(self.visual_model.output_size, self.visual_model.output_size // 2),
-            # torch.nn.LayerNorm(self.visual_model.output_size//2),
             torch.nn.GELU(),
         )
         self.text_projection_layer = torch.nn.Sequential(
             torch.nn.Linear(self.text_model.config.hidden_size, self.text_model.config.hidden_size // 2),
-            # torch.nn.LayerNorm(self.text_model.config.hidden_size // 2),
             torch.nn.GELU(),
         )
         self.bilstm = torch.nn.LSTM(
@@ -37,7 +35,7 @@ class CombinedModel(torch.nn.Module):
             bidirectional=True,
             batch_first=True,
             )
-        #self.crf = CRF(num_labels, batch_first=True)
+        self.crf = CRF(num_labels, batch_first=True)
 
     def forward(self, visual_feats, text_feats):
         visual_out = self.visual_model(visual_feats)
