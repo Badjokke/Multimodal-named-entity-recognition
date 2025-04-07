@@ -73,7 +73,6 @@ async def create_vit_lstm_model():
 
 
 async def llama_vit_multimodal():
-    model_name = "meta-llama/Llama-3.1-8B"
     print("Loading dataset")
     t17_loader = JsonlDatasetLoader()
     data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
