@@ -39,7 +39,7 @@ def load_and_filter_state_dict(model_path: str) -> dict:
     return filtered_state_dict
 
 
-def plot_model_training(results: list[tuple[float, float, float]], path: str):
+def plot_model_training(results: list[dict[str,tuple]], path: str):
     print("Plotting training results")
     x = []
     y_train = []
@@ -47,10 +47,10 @@ def plot_model_training(results: list[tuple[float, float, float]], path: str):
     y_test = []
     for i in range(len(results)):
         x.append(i)
-        y_train.append(results[i][0])
-        y_val.append(results[i][1])
-        y_test.append(results[i][3])
-    plot = PlotBuilder.build_simple_plot([x] * 3, [y_train, y_val, y_test])
+        y_train.append(results[i]["train"][1]["macro"])
+        y_val.append(results[i]["val"][1]["macro"])
+        y_test.append(results[i]["test"][1]["macro"])
+    plot = PlotBuilder.build_simple_plot([x] * 3, [y_train, y_val, y_test], **{"labels":["train", "val", "test"], "x_axis_label": "epochs", "y_axis_label": "macro f1", "labels":["train f1 macro", "validation f1 macro", "test f1 macro"]})
     plot.plot()
     print(f"Saving plot to {path}")
     plot.save(path)

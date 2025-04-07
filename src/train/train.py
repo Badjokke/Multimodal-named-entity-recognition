@@ -34,15 +34,15 @@ def multimodal_training(model: Union[torch.nn.Module, PeftModel], train_data, va
     max_early_stop = TrainingUtil.create_maximizing_early_stop(patience=patience)
     best_state_dict = None
     training_results = []
-    for epoch in range(epochs):
-        training_loss = perform_epoch(model, tokenizer, train_data, optimizer, scheduler, {value: key for key, value in labels.items()}, w)
+    for epoch in range(3):
+        training_loss = perform_epoch(model, tokenizer, train_data, optimizer, {value: key for key, value in labels.items()}, w)
         val_loss = validate_after_epoch(model, tokenizer,  validation_data, {value: key for key, value in labels.items()}, w)
         test_results = validate_after_epoch(model, tokenizer, test_data, {value: key for key, value in labels.items()}, w)
         scheduler.step(val_loss[1]['macro'])
         print(f"[epoch: {epoch + 1}] Training loss: {training_loss[0]}. Training macro f1: {training_loss[1]['macro']}; micro f1: {training_loss[1]['micro']}, acc: {training_loss[1]['accuracy']}")
         print(f"[epoch: {epoch + 1}] Validation loss: {val_loss[0]}. Validation macro f1: {val_loss[1]['macro']}; micro f1: {val_loss[1]['micro']}, acc: {val_loss[1]['accuracy']}")
         print(f"[epoch: {epoch + 1}] Test loss: {test_results[0]}. Test macro f1: {test_results[1]['macro']}; micro f1: {test_results[1]['micro']}, acc: {test_results[1]['accuracy']}")
-        training_results.append({"train":training_loss, "validation": val_loss, "test":test_results})
+        training_results.append({"train":training_loss, "val": val_loss, "test":test_results})
 
         state = max_early_stop.verify(val_loss[1]['macro'])
         if state == StepState.STOP:
@@ -50,7 +50,7 @@ def multimodal_training(model: Union[torch.nn.Module, PeftModel], train_data, va
             break
         if state == StepState.BETTER:
             best_state_dict = model.state_dict()
-        return model, training_results, best_state_dict
+    return model, training_results, best_state_dict
 
 def text_only_training(model: Union[torch.nn.Module, PeftModel], train_data, validation_data, test_data, tokenizer,
                        class_occurrences, labels, epochs=10, patience=3):
@@ -94,9 +94,9 @@ def perform_epoch(model, tokenizer, train_data, optimizer, labels_mapping, w, sc
     running_loss = 0.0
     y_pred = []
     y_true = []
-    for i in range(len(train_data)):
+    for i in range(100):
         data_sample = train_data[i]
-        text = tokenizer(data_sample[0], return_tensors="pt", is_split_into_words=True, device=device) if tokenizer is not None else data_sample[0]
+        text = tokenizer(data_sample[0], return_tensors="pt", is_split_into_words=True).to(device) if tokenizer is not None else data_sample[0]
         images, labels = data_sample[1].to(device), torch.tensor(data_sample[2], dtype=torch.long,device=device)
 
         word_ids = text.word_ids()
@@ -137,7 +137,7 @@ def validate_after_epoch(model, tokenizer, validation_data, labels_mapping, w) -
     running_loss = 0.
     y_true, y_pred = [], []
     with torch.no_grad():
-        for i in range(len(validation_data)):
+        for i in range(100):
             data_sample = validation_data[i]
             text = tokenizer(data_sample[0], return_tensors="pt",
                              is_split_into_words=True) if tokenizer is not None else data_sample[0]

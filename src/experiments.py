@@ -2,7 +2,6 @@ import asyncio
 import time
 from typing import Callable, Coroutine
 
-from PyQt6.QtCore.QProcess import state
 from torch import save
 from huggingface_hub import login
 
@@ -14,6 +13,7 @@ from metrics.plot_builder import PlotBuilder
 from model.model_factory import ModelFactory
 from model.util import plot_model_training
 from security.token_manager import TokenManager
+from src.model.configuration.quantization import create_parameter_efficient_model
 from train import train
 
 
@@ -65,7 +65,6 @@ async def analyze_dataset(dataset_loader: Callable[[], Coroutine]):
                                       plot_label="T17 test set")
     bar.plot()
 
-
 async def multimodal_pipeline(model_save_directory: str):
     print("Running multimodal pipeline")
     t17_loader = JsonlDatasetLoader()
@@ -75,18 +74,17 @@ async def multimodal_pipeline(model_save_directory: str):
     print("Training bert+vit")
     combined, results, state_dict = train.multimodal_training(bert_vit, data['train'], data["val"], data["test"], tokenizer,
                                                   class_occurrences, labels, epochs=10, patience=2)
-    plot_model_training(results, f"{model_save_directory}/fig/plot.png")
+    plot_model_training(results, f"{model_save_directory}/bert/t17/fig/plot.png")
     save(state_dict, model_save_directory + "/bert_vit_cross_attention.pth")
-    """
-    torch.save(combined.state_dict(), model_save_directory + "/bert_vit_cross_attention.pth")
-    llama_vit, tokenizer = ModelFactory.create_llama_vit_attention_classifier(len(labels.keys()))
-    # combined.text_model = merge_lora_layers_with_text_model(combined)
-    print("Saving model")
-    combined.save_pretrained("peft_finetuned_llama.pth")
-    MODEL_OUT_PATH = "./combined_model_roberta_vit.pth"
-    torch.save(combined.state_dict(), MODEL_OUT_PATH)
+    print()
+    print("Training llama+vit")
+    llama, llama_tokenizer = ModelFactory.create_llama_vit_attention_classifier(len(labels.keys()))
+    combined, results, state_dict = train.multimodal_training(create_parameter_efficient_model(llama), data['train'], data["val"], data["test"], llama_tokenizer,
+                                                  class_occurrences, labels, epochs=10, patience=2)
+    plot_model_training(results, f"{model_save_directory}/llama/t17/fig/plot.png")
+    save(state_dict, model_save_directory + "/llama_vit_cross_attention_peft.pth")
+    print()
     print("Leaving")
-    """
 
 
 if __name__ == "__main__":
@@ -96,7 +94,7 @@ if __name__ == "__main__":
     # asyncio.run(llama_vit_multimodal())
     # asyncio.run(preprocess_twitter15())
     # t17_loader = JsonlDatasetLoader(lightweight=True)
-    asyncio.run(multimodal_pipeline("../models/bert/t17"))
+    asyncio.run(multimodal_pipeline("../models"))
     """
     random_input = torch.LongTensor([1, 2, 3, 4, 5, 6, 7])
     lstm = create_lstm(24)
