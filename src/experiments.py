@@ -13,7 +13,7 @@ from metrics.plot_builder import PlotBuilder
 from model.model_factory import ModelFactory
 from model.util import plot_model_training
 from security.token_manager import TokenManager
-from src.model.configuration.quantization import create_parameter_efficient_model
+from model.configuration.quantization import create_parameter_efficient_model
 from train import train
 
 
