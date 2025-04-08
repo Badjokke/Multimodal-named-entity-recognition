@@ -10,6 +10,8 @@ from model.multimodal.PartialPredictionMultimodalModel import PartialPredictionM
 from model.visual.AlexNetCNN import ConvNet
 from model.visual.ViTWrapper import ViT
 
+from model.visual.VisualModelClassifier import VisualModelClassifier
+
 
 class ModelFactory:
 
@@ -48,6 +50,19 @@ class ModelFactory:
         tokenizer = AutoTokenizer.from_pretrained(model_name, add_bos_token=True)
         tokenizer.pad_token = tokenizer.eos_token
         return model, tokenizer
+
+    """
+    -- visual factory functions
+    """
+    @staticmethod
+    def create_vit_classifier(label_count):
+        vit, processor = ModelFactory.__create_vit()
+        return ModelFactory.__create_visual_model_classificator(ViT(vit, processor), label_count)
+
+    @staticmethod
+    def create_cnn_classifier(label_count):
+        conv = ModelFactory.__create_convolutional_net()
+        return ModelFactory.__create_visual_model_classificator(conv, label_count)
     """
     -- lstm factory functions --
     """
@@ -86,7 +101,7 @@ class ModelFactory:
     def create_bert_vit_attention_classifier(label_count):
         bert, tokenizer = ModelFactory.__create_bert_large()
         vit, processor = ModelFactory.__create_vit()
-        return ModelFactory.__create_cross_attention_multimodal_model(ViT(vit, processor), bert, label_count), tokenizer
+        return ModelFactory.__create_cross_attention_multimodal_model(ViT(vit, processor), bert,label_count), tokenizer
 
     @staticmethod
     def create_bert_vit_linear_fusion(label_count):
@@ -140,3 +155,7 @@ class ModelFactory:
     @staticmethod
     def __create_partial_prediction_model(text_model, visual_model, label_count):
         return PartialPredictionMultimodalModel(text_model, visual_model, label_count)
+
+    @staticmethod
+    def __create_visual_model_classificator(visual_model, label_count):
+        return VisualModelClassifier(visual_model, label_count)

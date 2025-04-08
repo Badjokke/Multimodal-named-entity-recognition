@@ -65,25 +65,60 @@ async def analyze_dataset(dataset_loader: Callable[[], Coroutine]):
                                       plot_label="T17 test set")
     bar.plot()
 
+
+async def unimodal_image_pipeline_t17(model_save_directory:str):
+    print("Running T17 unimodal pipeline")
+    t17_loader = JsonlDatasetLoader()
+    data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
+    print("Training vit classifier")
+    vit_classifier = ModelFactory.create_vit_classifier(len(labels.keys()))
+    combined, results, state_dict = train.image_only_training(vit_classifier, data['train'], data["val"], data["test"], class_occurrences, labels, epochs=15,patience=3)
+    plot_model_training(results, f"{model_save_directory}/vit/t17/fig/plot.png","ViT classifier")
+    save(state_dict, model_save_directory + "/vit_classifier.pth")
+    print()
+    print("Training cnn classifier")
+    cnn_classifier = ModelFactory.create_cnn_classifier(len(labels.keys()))
+    combined, results, state_dict = train.image_only_training(cnn_classifier, data['train'], data["val"], data["test"], class_occurrences, labels, epochs=15,patience=3)
+    plot_model_training(results, f"{model_save_directory}/alex/t17/fig/plot.png","AlexNet classifier")
+    save(state_dict, model_save_directory + "/cnn_classifier.pth")
+    print("---image pipeline over---\n")
+
+
+async def unimodal_text_pipeline_t17(model_save_directory:str):
+    print("Running T17 unimodal pipeline")
+    t17_loader = JsonlDatasetLoader()
+    data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
+    print("Training bert text only")
+    bert_crf, tokenizer = ModelFactory.create_bert_text_only_classifier(len(labels.keys()))
+    combined, results, state_dict = train.transformer_training(bert_crf, data['train'], data["val"], data["test"],tokenizer, class_occurrences, labels, epochs=15,patience=3, text_only=True)
+    plot_model_training(results, f"{model_save_directory}/bert/t17/text/fig/plot.png","BERT crf text only")
+    save(state_dict, model_save_directory + "/bert_crf.pth")
+    print()
+    print("Training llama text only")
+    llama, tokenizer = ModelFactory.create_llama_text_only_classifier(len(labels.keys()))
+    combined, results, state_dict = train.transformer_training(create_parameter_efficient_model(llama), data['train'], data["val"], data["test"],tokenizer, class_occurrences, labels, epochs=15,patience=3, text_only=True)
+    plot_model_training(results, f"{model_save_directory}/llama/t17/text/fig/plot.png","Llama crf text only")
+    save(state_dict, model_save_directory + "/bert_crf.pth")
+    print("---text pipeline over---\n")
+
 async def multimodal_pipeline_t17(model_save_directory: str):
     print("Running T17 multimodal pipeline")
     t17_loader = JsonlDatasetLoader()
     data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
-
     bert_vit, tokenizer = ModelFactory.create_bert_vit_attention_classifier(len(labels.keys()))
     print("Training bert+vit")
-    combined, results, state_dict = train.multimodal_training(bert_vit, data['train'], data["val"], data["test"], tokenizer,
-                                                  class_occurrences, labels, epochs=15, patience=2)
+    combined, results, state_dict = train.transformer_training(bert_vit, data['train'], data["val"], data["test"], tokenizer,
+                                                               class_occurrences, labels, epochs=15, patience=2)
     plot_model_training(results, f"{model_save_directory}/bert/t17/fig/plot.png", "Multimodal Cross Attention BERT with CRF")
     save(state_dict, model_save_directory + "/bert_vit_cross_attention.pth")
     print()
     print("Training llama+vit")
     llama, llama_tokenizer = ModelFactory.create_llama_vit_attention_classifier(len(labels.keys()))
-    combined, results, state_dict = train.multimodal_training(create_parameter_efficient_model(llama), data['train'], data["val"], data["test"], llama_tokenizer,
-                                                  class_occurrences, labels, epochs=15, patience=2)
+    combined, results, state_dict = train.transformer_training(create_parameter_efficient_model(llama), data['train'], data["val"], data["test"], llama_tokenizer,
+                                                               class_occurrences, labels, epochs=15, patience=2)
     plot_model_training(results, f"{model_save_directory}/llama/t17/fig/plot.png", "Multimodal Cross Attention Llama with CRF")
     save(state_dict, model_save_directory + "/llama_vit_cross_attention_peft.pth")
-    print()
+    print("---multimodal pipeline over---\n")
 
 async def multimodal_pipeline_t15(model_save_directory: str):
     print("Running T15 multimodal pipeline")
@@ -92,17 +127,17 @@ async def multimodal_pipeline_t15(model_save_directory: str):
 
     bert_vit, tokenizer = ModelFactory.create_bert_vit_attention_classifier(len(labels.keys()))
     print("Training bert+vit")
-    combined, results, state_dict = train.multimodal_training(bert_vit, data['train'], data["val"], data["test"],
-                                                              tokenizer,
-                                                              class_occurrences, labels, epochs=10, patience=2)
+    combined, results, state_dict = train.transformer_training(bert_vit, data['train'], data["val"], data["test"],
+                                                               tokenizer,
+                                                               class_occurrences, labels, epochs=10, patience=2)
     plot_model_training(results, f"{model_save_directory}/bert/t15/fig/plot.png", "Multimodal Cross Attention BERT with CRF")
     save(state_dict, model_save_directory + "/bert_vit_cross_attention.pth")
     print()
     print("Training llama+vit")
     llama, llama_tokenizer = ModelFactory.create_llama_vit_attention_classifier(len(labels.keys()))
-    combined, results, state_dict = train.multimodal_training(create_parameter_efficient_model(llama), data['train'],
-                                                              data["val"], data["test"], llama_tokenizer,
-                                                              class_occurrences, labels, epochs=10, patience=2)
+    combined, results, state_dict = train.transformer_training(create_parameter_efficient_model(llama), data['train'],
+                                                               data["val"], data["test"], llama_tokenizer,
+                                                               class_occurrences, labels, epochs=10, patience=2)
     plot_model_training(results, f"{model_save_directory}/llama/t15/fig/plot.png", "Multimodal Cross Attention Llama with CRF")
     save(state_dict, model_save_directory + "/llama_vit_cross_attention_peft.pth")
     print()
@@ -112,10 +147,14 @@ if __name__ == "__main__":
     token_manager = TokenManager()
     login(token_manager.get_access_token())
     # asyncio.run(preprocess_twitter15())
-    # asyncio.run(llama_vit_multimodal())
+    #asyncio.run(llama_vit_multimodal())
     # asyncio.run(preprocess_twitter15())
     # t17_loader = JsonlDatasetLoader(lightweight=True)
+    print("== running T17 STUFF ==")
+    asyncio.run(unimodal_image_pipeline_t17("../models"))
+    asyncio.run(unimodal_text_pipeline_t17("../models"))
     asyncio.run(multimodal_pipeline_t17("../models"))
+    print("== running T15 STUFF ==")
     asyncio.run(multimodal_pipeline_t15("../models"))
     """
     random_input = torch.LongTensor([1, 2, 3, 4, 5, 6, 7])

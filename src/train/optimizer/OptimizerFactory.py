@@ -16,8 +16,8 @@ class OptimizerFactory:
         alchemy optimizer
         """
         no_decay = ['bias', 'LayerNorm.weight']
-        bert_params = [(n, p) for n, p in model.text_model.named_parameters()]
-        vit_params = [(n, p) for n, p in model.visual_model.named_parameters()]
+        bert_params = [(n, p) for n, p in model.text_model.named_parameters()] if hasattr(model,"text_model") else []
+        vit_params = [(n, p) for n, p in model.visual_model.named_parameters()] if hasattr(model,"visual_model") else []
         fusion_params = [(n, p) for n, p in model.named_parameters() if
                          any(x in n for x in ['fusion_layer', 'projection_layer', 'text_projection_layer'])]
         bilstm_params = [(n, p) for n, p in model.named_parameters() if 'bilstm' in n]

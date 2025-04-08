@@ -126,7 +126,6 @@ class JsonlDatasetLoader(AbstractDatasetLoader):
             image_refs = json['image'] if "image" in json else json["images"]
             images = self.__process_image_refs(image_set, json['image'] if "image" in json else json["images"])
             if images is None:
-                print(f"missing images: {image_refs}. Skipping")
                 continue
             text = self.__apply_data_processor(json['text'], self.text_processors)
             collected_labels = self.__process_labels(json['label'], labels)
