@@ -4,6 +4,7 @@ from transformers import AutoTokenizer, LlamaModel, ViTImageProcessor, ViTModel,
 from model.configuration.quantization import create_default_quantization_config
 from model.language.LSTM import LSTM
 from model.language.TransformerCRF import TransformerCRF
+from model.language.LstmCRF import LstmCRF
 from model.multimodal.CrossAttentionMultimodalModel import CrossAttentionModel
 from model.multimodal.LinearFusionMultimodalModel import LinearFusionMultimodalModel
 from model.multimodal.PartialPredictionMultimodalModel import PartialPredictionMultimodalModel
@@ -69,13 +70,13 @@ class ModelFactory:
     @staticmethod
     def create_lstm_text_only_classifier(label_count, vocabulary, bidirectional=True):
         lstm = ModelFactory.__create_lstm(vocabulary, bidirectional)
-        return TransformerCRF(lstm, label_count)
+        return LstmCRF(lstm, label_count)
 
     @staticmethod
     def create_lstm_vit_attention_classifier(label_count, vocabulary, bidirectional=True):
         lstm = ModelFactory.__create_lstm(vocabulary, bidirectional)
         vit, processor = ModelFactory.__create_vit()
-        return ModelFactory.__create_cross_attention_multimodal_model(ViT(vit, processor), lstm, label_count)
+        return ModelFactory.__create_cross_attention_multimodal_model(lstm, ViT(vit, processor), label_count)
 
     @staticmethod
     def create_lstm_vit_linear_fusion(label_count, vocabulary, bidirectional=True):
@@ -101,7 +102,7 @@ class ModelFactory:
     def create_bert_vit_attention_classifier(label_count):
         bert, tokenizer = ModelFactory.__create_bert_large()
         vit, processor = ModelFactory.__create_vit()
-        return ModelFactory.__create_cross_attention_multimodal_model(ViT(vit, processor), bert,label_count), tokenizer
+        return ModelFactory.__create_cross_attention_multimodal_model(bert,ViT(vit, processor),label_count), tokenizer
 
     @staticmethod
     def create_bert_vit_linear_fusion(label_count):
@@ -127,7 +128,7 @@ class ModelFactory:
     def create_llama_vit_attention_classifier(label_count):
         llama, tokenizer = ModelFactory.__create_llama_model_quantized()
         vit, processor = ModelFactory.__create_vit()
-        return ModelFactory.__create_cross_attention_multimodal_model(ViT(vit, processor), llama, label_count), tokenizer
+        return ModelFactory.__create_cross_attention_multimodal_model(llama,ViT(vit, processor), label_count), tokenizer
 
     @staticmethod
     def create_llama_vit_linear_fusion(label_count):

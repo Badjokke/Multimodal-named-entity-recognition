@@ -116,7 +116,7 @@ def validate_after_epoch_image_only(model, train_data, labels_mapping, loss_crit
 """
 -- lstm based methods due to different tokenizer
 """
-def lstm_training(model: Union[torch.nn.Module, PeftModel], train_data, validation_data, test_data, class_occurrences, labels, epochs=50, patience=3, text_only=False):
+def lstm_training(model: Union[torch.nn.Module, PeftModel], train_data, validation_data, test_data, class_occurrences, labels, epochs=50, patience=3, text_only=False, cross_loss=False):
     model.to(device)
     optimizer = OptimizerFactory.create_adamw_optimizer(model)
     scheduler = OptimizerFactory.create_plateau_scheduler(optimizer)
@@ -124,10 +124,11 @@ def lstm_training(model: Union[torch.nn.Module, PeftModel], train_data, validati
     max_early_stop = TrainingUtil.create_maximizing_early_stop(patience=patience)
     best_state_dict = None
     training_results = []
+    loss_criterion = None if not cross_loss else TrainingUtil.create_cross_entropy_loss_criterion(class_occurrences)
     for epoch in range(epochs):
-        training_loss = perform_epoch_lstm(model, train_data, optimizer, {value: key for key, value in labels.items()}, w, text_only=text_only)
-        val_loss = validate_after_epoch_lstm(model, validation_data, {value: key for key, value in labels.items()}, w, text_only=text_only)
-        test_results = validate_after_epoch_lstm(model, test_data, {value: key for key, value in labels.items()}, w, text_only=text_only)
+        training_loss = perform_epoch_lstm(model, train_data, optimizer, {value: key for key, value in labels.items()}, w, text_only=text_only, loss_criterion=loss_criterion)
+        val_loss = validate_after_epoch_lstm(model, validation_data, {value: key for key, value in labels.items()}, w, text_only=text_only, loss_criterion=loss_criterion)
+        test_results = validate_after_epoch_lstm(model, test_data, {value: key for key, value in labels.items()}, w, text_only=text_only, loss_criterion=loss_criterion)
         scheduler.step(val_loss[1]['macro'])
         print("---")
         print(
@@ -147,7 +148,7 @@ def lstm_training(model: Union[torch.nn.Module, PeftModel], train_data, validati
             best_state_dict = model.state_dict()
     return model, training_results, best_state_dict
 
-def perform_epoch_lstm(model, train_data, optimizer, labels_mapping, w, scheduler=None, text_only=False):
+def perform_epoch_lstm(model, train_data, optimizer, labels_mapping, w, scheduler=None, text_only=False, loss_criterion=None):
     model.train()
     running_loss = 0.0
     y_pred = []
@@ -164,10 +165,10 @@ def perform_epoch_lstm(model, train_data, optimizer, labels_mapping, w, schedule
             aligned_labels = aligned_labels.repeat(images.size(0), 1)
             outputs = model(images, text, unpack=False)
         else:
-            outputs = model(text, unpack=False)
+            outputs = model(text)
         mask = torch.ones_like(aligned_labels, device=device).bool()
 
-        loss = model.crf_pass(outputs, aligned_labels, mask, w)
+        loss = model.crf_pass(outputs, aligned_labels, mask, w) if loss_criterion is None else loss_criterion(outputs.permute(0,2,1), aligned_labels)
         running_loss += loss.item()
 
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
@@ -177,7 +178,7 @@ def perform_epoch_lstm(model, train_data, optimizer, labels_mapping, w, schedule
             scheduler.step()
 
         y_true.append(aligned_labels.tolist())
-        y_pred.append(model.crf_decode(outputs, mask))
+        y_pred.append(model.crf_decode(outputs, mask) if loss_criterion is None else torch.argmax(outputs, dim=-1).tolist())
 
     metrics = Metrics(y_pred, y_true, len(labels_mapping.keys()), labels_mapping)
     macro_f1 = metrics.macro_f1(metrics.confusion_matrix())
@@ -186,7 +187,7 @@ def perform_epoch_lstm(model, train_data, optimizer, labels_mapping, w, schedule
 
     return running_loss / len(train_data), {"macro": macro_f1, "micro": micro_f1, "accuracy": acc}
 
-def validate_after_epoch_lstm(model, validation_data, labels_mapping, w, text_only=False) -> tuple[
+def validate_after_epoch_lstm(model, validation_data, labels_mapping, w, text_only=False, loss_criterion=None) -> tuple[
     float, dict[str, float]]:
     model.eval()
     running_loss = 0.
@@ -200,17 +201,16 @@ def validate_after_epoch_lstm(model, validation_data, labels_mapping, w, text_on
 
             if not text_only:
                 aligned_labels = aligned_labels.repeat(images.size(0), 1)
-                outputs = model(images, text)
+                outputs = model(images, text, unpack=False)
             else:
                 outputs = model(text)
 
-            aligned_labels = aligned_labels[0:, 1:-1]
-            outputs = outputs[0:, 1:-1]
             mask = torch.ones_like(aligned_labels, device=device).bool()
-            loss = model.crf_pass(outputs, aligned_labels, mask, w)
+            loss = model.crf_pass(outputs, aligned_labels, mask, w) if loss_criterion is None else loss_criterion(outputs.permute(0, 2, 1), aligned_labels)
+
             running_loss += loss.item()
             y_true.append(aligned_labels.tolist())
-            y_pred.append(model.crf_decode(outputs, mask))
+            y_pred.append(model.crf_decode(outputs, mask) if loss_criterion is None else torch.argmax(outputs, dim=-1).tolist())
 
     metrics = Metrics(y_pred, y_true, len(labels_mapping.keys()), labels_mapping)
     macro_f1 = metrics.macro_f1(metrics.confusion_matrix())
