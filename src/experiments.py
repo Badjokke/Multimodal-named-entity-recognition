@@ -68,21 +68,6 @@ async def analyze_dataset(dataset_loader: Callable[[], Coroutine]):
 
 
 async def unimodal_image_pipeline_t17(model_save_directory:str):
-    print("Training lstm+vit")
-    t17_loader = JsonlDatasetLoader(text_processors=[StemmingTextDataProcessor()])
-    data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
-    lstm = ModelFactory.create_lstm_vit_attention_classifier(len(labels.keys()), vocabulary)
-    combined, results, state_dict = train.lstm_training(lstm, data['train'],
-                                                               data["val"], data["test"],
-                                                               class_occurrences, labels, patience=5)
-    plot_model_training(results, f"{model_save_directory}/lstm/t17/fig/plot.png",
-                        "Multimodal Cross Attention LSTM with CRF")
-    save(state_dict, model_save_directory + "/lstm_vit_cross_attention_peft.pth")
-
-
-
-
-
     print("Running T17 unimodal pipeline")
     t17_loader = JsonlDatasetLoader()
     data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
