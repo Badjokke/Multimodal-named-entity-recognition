@@ -9,6 +9,7 @@ from data.dataset_analyzer import DatasetAnalyzer
 from data.twitter_loaders.twitter2017_dataset_loader import JsonlDatasetLoader
 from data.twitter_preprocessors.twitter2015_preprocessor import Twitter2015Preprocessor
 from data.twitter_preprocessors.twitter2017_preprocessor import Twitter2017Preprocessor
+from data.text_data_processor.stemming_json_data_processor import StemmingTextDataProcessor
 from metrics.plot_builder import PlotBuilder
 from model.model_factory import ModelFactory
 from model.util import plot_model_training
@@ -67,6 +68,21 @@ async def analyze_dataset(dataset_loader: Callable[[], Coroutine]):
 
 
 async def unimodal_image_pipeline_t17(model_save_directory:str):
+    print("Training lstm+vit")
+    t17_loader = JsonlDatasetLoader(text_processors=[StemmingTextDataProcessor()])
+    data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
+    lstm = ModelFactory.create_lstm_vit_attention_classifier(len(labels.keys()), vocabulary)
+    combined, results, state_dict = train.lstm_training(lstm, data['train'],
+                                                               data["val"], data["test"],
+                                                               class_occurrences, labels, patience=5)
+    plot_model_training(results, f"{model_save_directory}/lstm/t17/fig/plot.png",
+                        "Multimodal Cross Attention LSTM with CRF")
+    save(state_dict, model_save_directory + "/lstm_vit_cross_attention_peft.pth")
+
+
+
+
+
     print("Running T17 unimodal pipeline")
     t17_loader = JsonlDatasetLoader()
     data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
@@ -99,25 +115,51 @@ async def unimodal_text_pipeline_t17(model_save_directory:str):
     combined, results, state_dict = train.transformer_training(create_parameter_efficient_model(llama), data['train'], data["val"], data["test"],tokenizer, class_occurrences, labels, epochs=15,patience=3, text_only=True)
     plot_model_training(results, f"{model_save_directory}/llama/t17/text/fig/plot.png","Llama crf text only")
     save(state_dict, model_save_directory + "/bert_crf.pth")
+    print()
+    print("Training lstm+vit")
+    t17_loader = JsonlDatasetLoader(text_processors=[StemmingTextDataProcessor()])
+    data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
+    lstm = ModelFactory.create_lstm_vit_attention_classifier(len(labels.keys()), vocabulary)
+    combined, results, state_dict = train.lstm_training(lstm, data['train'],
+                                                        data["val"], data["test"],
+                                                        class_occurrences, labels, patience=5)
+    plot_model_training(results, f"{model_save_directory}/lstm/t17/fig/plot.png",
+                        "Multimodal Cross Attention LSTM with CRF")
+    save(state_dict, model_save_directory + "/lstm_vit_cross_attention_peft.pth")
     print("---text pipeline over---\n")
 
 async def multimodal_pipeline_t17(model_save_directory: str):
     print("Running T17 multimodal pipeline")
     t17_loader = JsonlDatasetLoader()
     data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
-    bert_vit, tokenizer = ModelFactory.create_bert_vit_attention_classifier(len(labels.keys()))
+    #bert_vit, tokenizer = ModelFactory.create_bert_vit_attention_classifier(len(labels.keys()))
+    bert_vit, tokenizer = ModelFactory.create_bert_vit_partial_prediction(len(labels.keys()))
     print("Training bert+vit")
     combined, results, state_dict = train.transformer_training(bert_vit, data['train'], data["val"], data["test"], tokenizer,
-                                                               class_occurrences, labels, epochs=15, patience=2)
+                                                               class_occurrences, labels, epochs=15, patience=2, cross_loss=True)
     plot_model_training(results, f"{model_save_directory}/bert/t17/fig/plot.png", "Multimodal Cross Attention BERT with CRF")
-    save(state_dict, model_save_directory + "/bert_vit_cross_attention.pth")
+    save(state_dict, f"{model_save_directory}/bert/t17/bert_vit_cross_attention.pth")
     print()
     print("Training llama+vit")
     llama, llama_tokenizer = ModelFactory.create_llama_vit_attention_classifier(len(labels.keys()))
     combined, results, state_dict = train.transformer_training(create_parameter_efficient_model(llama), data['train'], data["val"], data["test"], llama_tokenizer,
                                                                class_occurrences, labels, epochs=15, patience=2)
     plot_model_training(results, f"{model_save_directory}/llama/t17/fig/plot.png", "Multimodal Cross Attention Llama with CRF")
-    save(state_dict, model_save_directory + "/llama_vit_cross_attention_peft.pth")
+    save(state_dict, f"{model_save_directory}/bert/t17/llama_vit_cross_attention_peft.pth")
+
+    print()
+
+    print("Training lstm+vit")
+    t17_loader = JsonlDatasetLoader(text_processors=[StemmingTextDataProcessor()])
+    data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
+    lstm = ModelFactory.create_lstm_vit_attention_classifier(len(labels.keys()),vocabulary)
+    combined, results, state_dict = train.lstm_training(lstm, data['train'],
+                                                               data["val"], data["test"],
+                                                               class_occurrences, labels, patience=5)
+    plot_model_training(results, f"{model_save_directory}/lstm/t17/fig/plot.png",
+                        "Multimodal Cross Attention LSTM with CRF")
+    save(state_dict, f"{model_save_directory}/bert/t17//lstm_vit_cross_attention_peft.pth")
+
     print("---multimodal pipeline over---\n")
 
 async def multimodal_pipeline_t15(model_save_directory: str):
@@ -151,8 +193,8 @@ if __name__ == "__main__":
     # asyncio.run(preprocess_twitter15())
     # t17_loader = JsonlDatasetLoader(lightweight=True)
     print("== running T17 STUFF ==")
-    asyncio.run(unimodal_image_pipeline_t17("../models"))
-    asyncio.run(unimodal_text_pipeline_t17("../models"))
+    #asyncio.run(unimodal_image_pipeline_t17("../models"))
+    #asyncio.run(unimodal_text_pipeline_t17("../models"))
     asyncio.run(multimodal_pipeline_t17("../models"))
     print("== running T15 STUFF ==")
     asyncio.run(multimodal_pipeline_t15("../models"))

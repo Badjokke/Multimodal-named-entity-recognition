@@ -32,20 +32,14 @@ class CrossAttentionModel(torch.nn.Module):
         )
         self.__fusion_layer = torch.nn.Sequential(
             torch.nn.Linear(self.hidden_state_size * 2,
-                            self.text_model.config.hidden_size // 2),
-            torch.nn.LayerNorm(self.text_model.config.hidden_size // 2),
-            torch.nn.GELU()
-        )
-        self.__out_layer = torch.nn.Sequential(
-            torch.nn.Dropout(0.3),
-            torch.nn.Linear(self.text_model.config.hidden_size // 2, num_labels)
+                            num_labels),
         )
 
         self.crf = CRF(num_labels, batch_first=True)
 
-    def forward(self, visual_feats, text_feats):
+    def forward(self, visual_feats, text_feats, unpack=True):
         visual_out = self.visual_model(visual_feats)
-        text_out = self.text_model(**text_feats).last_hidden_state
+        text_out = self.text_model(**text_feats).last_hidden_state if unpack else self.text_model(text_feats)
         text_out = text_out.repeat(visual_feats.size(0), 1, 1)
         visual_out = visual_out.unsqueeze(1).expand(-1, text_out.size(1), -1)
 
@@ -57,8 +51,7 @@ class CrossAttentionModel(torch.nn.Module):
         image_attended, _ = self.text_cross_attention(visual_out, text_out, text_out)
         text_attended, _ = self.image_cross_attention(text_out, visual_out + image_attended, visual_out + image_attended)
 
-        combined = self.__fusion_layer(torch.cat([text_attended+text_out, image_attended], dim=-1))
-        return self.__out_layer(combined)
+        return self.__fusion_layer(torch.cat([text_attended+text_out, image_attended], dim=-1))
 
     def crf_pass(self, x, y, mask, weight):
         base_loss = -self.crf(x, y, mask, reduction="mean")

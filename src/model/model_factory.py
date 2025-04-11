@@ -67,27 +67,27 @@ class ModelFactory:
     -- lstm factory functions --
     """
     @staticmethod
-    def create_lstm_text_only_classifier(label_count, vocab_size, bidirectional=True):
-        lstm, tokenizer = ModelFactory.__create_lstm(vocab_size, bidirectional)
-        return TransformerCRF(lstm, label_count), tokenizer
+    def create_lstm_text_only_classifier(label_count, vocabulary, bidirectional=True):
+        lstm = ModelFactory.__create_lstm(vocabulary, bidirectional)
+        return TransformerCRF(lstm, label_count)
 
     @staticmethod
-    def create_lstm_vit_attention_classifier(label_count, vocab_size, bidirectional=True):
-        lstm, tokenizer = ModelFactory.__create_lstm(vocab_size, bidirectional)
+    def create_lstm_vit_attention_classifier(label_count, vocabulary, bidirectional=True):
+        lstm = ModelFactory.__create_lstm(vocabulary, bidirectional)
         vit, processor = ModelFactory.__create_vit()
-        return ModelFactory.__create_cross_attention_multimodal_model(ViT(vit, processor), lstm, label_count), tokenizer
+        return ModelFactory.__create_cross_attention_multimodal_model(ViT(vit, processor), lstm, label_count)
 
     @staticmethod
-    def create_lstm_vit_linear_fusion(label_count, vocab_size, bidirectional=True):
-        lstm, tokenizer = ModelFactory.__create_lstm(vocab_size, bidirectional)
+    def create_lstm_vit_linear_fusion(label_count, vocabulary, bidirectional=True):
+        lstm = ModelFactory.__create_lstm(vocabulary, bidirectional)
         vit, processor = ModelFactory.__create_vit()
-        return ModelFactory.__create_linear_fusion_model(lstm, ViT(vit, processor), label_count), tokenizer
+        return ModelFactory.__create_linear_fusion_model(lstm, ViT(vit, processor), label_count)
 
     @staticmethod
-    def create_bert_vit_partial_prediction(label_count, vocab_size, bidirectional=True):
-        lstm, tokenizer = ModelFactory.__create_lstm(vocab_size, bidirectional)
+    def create_lstm_vit_partial_prediction(label_count, vocabulary, bidirectional=True):
+        lstm = ModelFactory.__create_lstm(vocabulary, bidirectional)
         vit, processor = ModelFactory.__create_vit()
-        return ModelFactory.__create_partial_prediction_model(lstm, ViT(vit, processor), label_count), tokenizer
+        return ModelFactory.__create_partial_prediction_model(lstm, ViT(vit, processor), label_count)
 
     """
     -- bert factory functions --
@@ -146,15 +146,15 @@ class ModelFactory:
     """
     @staticmethod
     def __create_cross_attention_multimodal_model(text_model, visual_model, label_count):
-        return CrossAttentionModel(text_model, visual_model, label_count)
+        return CrossAttentionModel(text_model=text_model, visual_model=visual_model, num_labels=label_count)
 
     @staticmethod
     def __create_linear_fusion_model(text_model, visual_model, label_count):
-        return LinearFusionMultimodalModel(text_model, visual_model, label_count)
+        return LinearFusionMultimodalModel(text_model=text_model, visual_model=visual_model, num_labels=label_count)
 
     @staticmethod
     def __create_partial_prediction_model(text_model, visual_model, label_count):
-        return PartialPredictionMultimodalModel(text_model, visual_model, label_count)
+        return PartialPredictionMultimodalModel(visual_model=visual_model,text_model=text_model,num_labels=label_count)
 
     @staticmethod
     def __create_visual_model_classificator(visual_model, label_count):
