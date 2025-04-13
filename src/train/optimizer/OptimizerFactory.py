@@ -11,7 +11,7 @@ class OptimizerFactory:
         return torch.optim.SGD(parameters, lr=learning_rate, momentum=momentum, nesterov=True, weight_decay=0.0001)
 
     @staticmethod
-    def create_adamw_optimizer(model) -> torch.optim.AdamW:
+    def create_adamw_optimizer(model, learning_rates=dict[str,float]) -> torch.optim.AdamW:
         """
         alchemy optimizer
         """
@@ -29,62 +29,63 @@ class OptimizerFactory:
             {
                 'params': [p for n, p in bert_params if not any(nd in n for nd in no_decay)],
                 'weight_decay': 0.01,
-                'lr': 8e-6
+                'lr': 8e-6 if "text_module" not in learning_rates else learning_rates["text_module"],
             },
             {
                 'params': [p for n, p in bert_params if any(nd in n for nd in no_decay)],
                 'weight_decay': 0.0,
-                'lr': 8e-6
+                'lr': 8e-6 if "text_module" not in learning_rates else learning_rates["text_module"]
             },
             # ViT parameters
             {
                 'params': [p for n, p in vit_params if not any(nd in n for nd in no_decay)],
                 'weight_decay': 0.01,
-                'lr': 8e-5
+                'lr': 8e-5 if "visual_module" not in learning_rates else learning_rates["visual_module"],
             },
             {
                 'params': [p for n, p in vit_params if any(nd in n for nd in no_decay)],
                 'weight_decay': 0.0,
-                'lr': 8e-5
+                'lr': 8e-5 if "visual_module" not in learning_rates else learning_rates["visual_module"]
             },
             # Fusion layer
             {
                 'params': [p for n, p in fusion_params if not any(nd in n for nd in no_decay)],
                 'weight_decay': 0.01,
-                'lr': 5e-4
+                'lr': 5e-4 if "fusion_layer" not in learning_rates else learning_rates["fusion_layer"]
             },
             {
                 'params': [p for n, p in fusion_params if any(nd in n for nd in no_decay)],
                 'weight_decay': 0.0,
-                'lr': 5e-4
+                'lr': 5e-4 if "fusion_layer" not in learning_rates else learning_rates["fusion_layer"]
+
             },
             # BiLSTM parameters
             {
                 'params': [p for n, p in bilstm_params if not any(nd in n for nd in no_decay)],
                 'weight_decay': 0.01,
-                'lr': 3e-4  # Modified learning rate
+                'lr': 3e-4  if "bilstm" not in learning_rates else learning_rates["bilstm"],
             },
             {
                 'params': [p for n, p in bilstm_params if any(nd in n for nd in no_decay)],
                 'weight_decay': 0.0,
-                'lr': 3e-4
+                'lr': 3e-4  if "bilstm" not in learning_rates else learning_rates["bilstm"],
             },
             # CRF parameters
             {
                 'params': [p for n, p in crf_params],
                 'weight_decay': 0.0,  # No weight decay for CRF
-                'lr': 2e-4  # Higher learning rate for CRF
+                'lr': 2e-4 if "crf" not in learning_rates else learning_rates["crf"],
             },
             # Other parameters
             {
                 'params': [p for n, p in other_params if not any(nd in n for nd in no_decay)],
                 'weight_decay': 0.01,
-                'lr': 1e-5
+                'lr': 1e-5 if "linear" not in learning_rates else learning_rates["linear"],
             },
             {
                 'params': [p for n, p in other_params if any(nd in n for nd in no_decay)],
                 'weight_decay': 0.0,
-                'lr': 1e-5
+                'lr': 1e-5 if "linear" not in learning_rates else learning_rates["linear"],
             }
         ]
         return torch.optim.AdamW(optimizer_grouped_parameters, weight_decay=0.01, eps=1e-9, betas=(0.9, 0.98))

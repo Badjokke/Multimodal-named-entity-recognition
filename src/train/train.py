@@ -19,9 +19,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 -- image classifiers
 """
 def image_only_training(model: Union[torch.nn.Module, PeftModel], train_data, validation_data, test_data,
-                           class_occurrences, labels, epochs=10, patience=3):
+                           class_occurrences, labels, epochs=10, patience=3, learning_rates={}):
     model.to(device)
-    optimizer = OptimizerFactory.create_adamw_optimizer(model)
+    optimizer = OptimizerFactory.create_adamw_optimizer(model, learning_rates=learning_rates)
     scheduler = OptimizerFactory.create_plateau_scheduler(optimizer)
     loss_criterion = TrainingUtil.create_cross_entropy_loss_criterion(class_occurrences)
     max_early_stop = TrainingUtil.create_maximizing_early_stop(patience=patience)
@@ -116,9 +116,9 @@ def validate_after_epoch_image_only(model, train_data, labels_mapping, loss_crit
 """
 -- lstm based methods due to different tokenizer
 """
-def lstm_training(model: Union[torch.nn.Module, PeftModel], train_data, validation_data, test_data, class_occurrences, labels, epochs=50, patience=3, text_only=False, cross_loss=False):
+def lstm_training(model: Union[torch.nn.Module, PeftModel], train_data, validation_data, test_data, class_occurrences, labels, epochs=50, patience=3, text_only=False, cross_loss=False, learning_rates={}):
     model.to(device)
-    optimizer = OptimizerFactory.create_adamw_optimizer(model)
+    optimizer = OptimizerFactory.create_adamw_optimizer(model, learning_rates=learning_rates)
     scheduler = OptimizerFactory.create_plateau_scheduler(optimizer)
     w = TrainingUtil.compute_class_weights_rare_events(class_occurrences)
     max_early_stop = TrainingUtil.create_maximizing_early_stop(patience=patience)
@@ -223,9 +223,9 @@ def validate_after_epoch_lstm(model, validation_data, labels_mapping, w, text_on
 -- transformer based with tokenizer
 """
 def transformer_training(model: Union[torch.nn.Module, PeftModel], train_data, validation_data, test_data, tokenizer,
-                         class_occurrences, labels, epochs=10, patience=3, text_only=False,cross_loss=False):
+                         class_occurrences, labels, epochs=10, patience=3, text_only=False,cross_loss=False, learning_rates={}):
     model.to(device)
-    optimizer = OptimizerFactory.create_adamw_optimizer(model)
+    optimizer = OptimizerFactory.create_adamw_optimizer(model, learning_rates=learning_rates)
     scheduler = OptimizerFactory.create_plateau_scheduler(optimizer)
     w = TrainingUtil.compute_class_weights_rare_events(class_occurrences)
     max_early_stop = TrainingUtil.create_maximizing_early_stop(patience=patience)

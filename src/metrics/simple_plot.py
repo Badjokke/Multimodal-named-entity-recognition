@@ -1,10 +1,12 @@
 import matplotlib.pyplot as plt
 
-
+"""
+uses global object NOT THREAD SAFE
+"""
 class SimplePlot:
     def __init__(self, x: list[list[float]], y: list[list[float]], x_axis_label: str = None, y_axis_label: str = None,
                  plot_title: str = None,
-                 labels: list[str] = [], colors: list[str] = [], fig_size: (int, int) = ()):
+                 labels: list[str] = [], colors: list[str] = [], fig_size: (int, int) = None):
         self.x = x
         self.y = y
         self.x_axis_label = x_axis_label
@@ -17,6 +19,7 @@ class SimplePlot:
 
     def plot(self) -> None:
         assert len(self.x) == len(self.y), f"x and y must have same length. Received {len(self.x)}, {len(self.y)}"
+        plt.figure(figsize=self.__get_fig_size(), clear=True)
         plt.xlabel(self.__get_x_axis_label())
         plt.ylabel(self.__get_y_axis_label())
         plt.title(self.__get_plot_title())
@@ -33,6 +36,7 @@ class SimplePlot:
     @staticmethod
     def save(path: str) -> None:
         plt.savefig(path, bbox_inches='tight')
+        plt.close()
 
     def __plot_data(self):
         for i in range(len(self.x)):
@@ -53,6 +57,9 @@ class SimplePlot:
 
     def __get_y_axis_label(self) -> str:
         return "y-axis" if self.y_axis_label is None else self.y_axis_label
-
+    """
+    creates 500 by 400 figure (in pixels)
+    configured in inches
+    """
     def __get_fig_size(self) -> tuple[int, int]:
-        return (800, 800) if self.fig_size is not None else self.fig_size
+        return (5, 4) if self.fig_size is None else self.fig_size
