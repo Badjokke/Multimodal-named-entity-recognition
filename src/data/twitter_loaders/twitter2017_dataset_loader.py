@@ -124,13 +124,17 @@ class JsonlDatasetLoader(AbstractDatasetLoader):
         result = []
         for json in jsonl:
             image_refs = json['image'] if "image" in json else json["images"]
-            images = self.__process_image_refs(image_set, json['image'] if "image" in json else json["images"])
+            images = self.__process_image_refs(image_set, image_refs)
+            # image is missing from dataset, skip
             if images is None:
                 continue
             text = self.__apply_data_processor(json['text'], self.text_processors)
             collected_labels = self.__process_labels(json['label'], labels)
             collected_labels = [label for i, label in enumerate(collected_labels) if text[i] is not None]
             text = list(filter(lambda x: x is not None, text))
+            # text is corrupt or filtered out if data_processors are not none; skip
+            if len(text) == 0:
+                continue
             assert len(collected_labels) == len(text), "post filtering of labels and text failed - len diff"
             result.append((text, images, collected_labels))
         return result
