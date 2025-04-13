@@ -3,7 +3,7 @@ import os
 from typing import Callable, Coroutine, AsyncGenerator
 
 import aiofiles
-
+MAX_DEPTH = 3
 async def load_file(path: str) -> bytes:
     async with aiofiles.open(path, 'rb') as f:
         return await f.read()
@@ -37,15 +37,21 @@ async def save_file(path: str, content: bytes):
         await f.write(content)
 
 
-async def _load_directory_contents(path, queue: asyncio.Queue, file_parser: Callable[[str], Coroutine]):
+async def _load_directory_contents(path, queue: asyncio.Queue, file_parser: Callable[[str], Coroutine],include_parent_dir, level=0):
     children = os.listdir(path)
+    parent = path.split(os.path.sep)[-1]
     for i in range(0, len(children)):
-        await queue.put((children[i], await file_parser(os.path.join(path, children[i]))))
-    await queue.put(None)
+        p = os.path.join(path, children[i])
+        if not os.path.isdir(p):
+            await queue.put((children[i] if not include_parent_dir else f"{parent}/{children[i]}", await file_parser(p)))
+            continue
+        if level < MAX_DEPTH:
+            await _load_directory_contents(p, queue, file_parser, level=level + 1, include_parent_dir=include_parent_dir)
+    if level == 0:
+        await queue.put(None)
 
-
-async def load_directory_contents(path: str, queue: asyncio.Queue):
-    await _load_directory_contents(path, queue, load_file)
+async def load_directory_contents(path: str, queue: asyncio.Queue, include_parent_dir=False):
+    await _load_directory_contents(path, queue, load_file, include_parent_dir)
 
 
 async def load_directory_contents_generator(path: str, queue: asyncio.Queue):
