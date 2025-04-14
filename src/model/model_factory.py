@@ -1,7 +1,7 @@
 from torch import float32
 from transformers import AutoTokenizer, LlamaModel, ViTImageProcessor, ViTModel, BertTokenizerFast, BertModel
 
-from model.configuration.quantization import create_default_quantization_config
+from model.configuration.quantization import create_default_quantization_config, create_parameter_efficient_model
 from model.language.LSTM import LSTM
 from model.language.TransformerCRF import TransformerCRF
 from model.language.LstmCRF import LstmCRF
@@ -79,16 +79,34 @@ class ModelFactory:
         return ModelFactory.__create_cross_attention_multimodal_model(lstm, ViT(vit, processor), label_count)
 
     @staticmethod
+    def create_lstm_cnn_attention_classifier(label_count, vocabulary, bidirectional=True):
+        lstm = ModelFactory.__create_lstm(vocabulary, bidirectional)
+        cnn = ModelFactory.__create_convolutional_net()
+        return ModelFactory.__create_cross_attention_multimodal_model(lstm, cnn, label_count)
+
+    @staticmethod
     def create_lstm_vit_linear_fusion(label_count, vocabulary, bidirectional=True):
         lstm = ModelFactory.__create_lstm(vocabulary, bidirectional)
         vit, processor = ModelFactory.__create_vit()
         return ModelFactory.__create_linear_fusion_model(lstm, ViT(vit, processor), label_count)
 
     @staticmethod
+    def create_lstm_cnn_linear_fusion(label_count, vocabulary, bidirectional=True):
+        lstm = ModelFactory.__create_lstm(vocabulary, bidirectional)
+        cnn = ModelFactory.__create_convolutional_net()
+        return ModelFactory.__create_linear_fusion_model(lstm, cnn, label_count)
+
+    @staticmethod
     def create_lstm_vit_partial_prediction(label_count, vocabulary, bidirectional=True):
         lstm = ModelFactory.__create_lstm(vocabulary, bidirectional)
         vit, processor = ModelFactory.__create_vit()
         return ModelFactory.__create_partial_prediction_model(lstm, ViT(vit, processor), label_count)
+
+    @staticmethod
+    def create_lstm_cnn_partial_prediction(label_count, vocabulary, bidirectional=True):
+        lstm = ModelFactory.__create_lstm(vocabulary, bidirectional)
+        cnn = ModelFactory.__create_convolutional_net()
+        return ModelFactory.__create_partial_prediction_model(lstm, cnn, label_count)
 
     """
     -- bert factory functions --
@@ -105,10 +123,22 @@ class ModelFactory:
         return ModelFactory.__create_cross_attention_multimodal_model(bert,ViT(vit, processor),label_count), tokenizer
 
     @staticmethod
+    def create_bert_cnn_attention_classifier(label_count):
+        bert, tokenizer = ModelFactory.__create_bert_large()
+        cnn = ModelFactory.__create_convolutional_net()
+        return ModelFactory.__create_cross_attention_multimodal_model(bert, cnn, label_count), tokenizer
+
+    @staticmethod
     def create_bert_vit_linear_fusion(label_count):
         bert, tokenizer = ModelFactory.__create_bert_large()
         vit, processor = ModelFactory.__create_vit()
         return ModelFactory.__create_linear_fusion_model(bert, ViT(vit, processor), label_count), tokenizer
+
+    @staticmethod
+    def create_bert_cnn_linear_fusion(label_count):
+        bert, tokenizer = ModelFactory.__create_bert_large()
+        cnn = ModelFactory.__create_convolutional_net()
+        return ModelFactory.__create_linear_fusion_model(bert, cnn, label_count), tokenizer
 
     @staticmethod
     def create_bert_vit_partial_prediction(label_count):
@@ -116,13 +146,19 @@ class ModelFactory:
         vit, processor = ModelFactory.__create_vit()
         return ModelFactory.__create_partial_prediction_model(bert, ViT(vit, processor), label_count), tokenizer
 
+    @staticmethod
+    def create_bert_cnn_partial_prediction(label_count):
+        bert, tokenizer = ModelFactory.__create_bert_large()
+        cnn = ModelFactory.__create_convolutional_net()
+        return ModelFactory.__create_partial_prediction_model(bert, cnn, label_count), tokenizer
+
     """
     -- llama factory functions --
     """
     @staticmethod
     def create_llama_text_only_classifier(label_count):
         llama, tokenizer = ModelFactory.__create_llama_model_quantized()
-        return TransformerCRF(llama, label_count), tokenizer
+        return TransformerCRF(create_parameter_efficient_model(llama), label_count), tokenizer
 
     @staticmethod
     def create_llama_vit_attention_classifier(label_count):
@@ -131,16 +167,34 @@ class ModelFactory:
         return ModelFactory.__create_cross_attention_multimodal_model(llama,ViT(vit, processor), label_count), tokenizer
 
     @staticmethod
+    def create_llama_cnn_attention_classifier(label_count):
+        llama, tokenizer = ModelFactory.__create_llama_model_quantized()
+        cnn = ModelFactory.__create_convolutional_net()
+        return ModelFactory.__create_cross_attention_multimodal_model(llama, cnn,label_count), tokenizer
+
+    @staticmethod
     def create_llama_vit_linear_fusion(label_count):
         llama, tokenizer = ModelFactory.__create_llama_model_quantized()
         vit, processor = ModelFactory.__create_vit()
         return ModelFactory.__create_linear_fusion_model(llama, ViT(vit, processor), label_count), tokenizer
 
     @staticmethod
+    def create_llama_cnn_linear_fusion(label_count):
+        llama, tokenizer = ModelFactory.__create_llama_model_quantized()
+        cnn = ModelFactory.__create_convolutional_net()
+        return ModelFactory.__create_linear_fusion_model(llama, cnn, label_count), tokenizer
+
+    @staticmethod
     def create_llama_vit_partial_prediction(label_count):
         llama, tokenizer = ModelFactory.__create_llama_model_quantized()
         vit, processor = ModelFactory.__create_vit()
         return ModelFactory.__create_partial_prediction_model(llama, ViT(vit, processor), label_count), tokenizer
+
+    @staticmethod
+    def create_llama_cnn_partial_prediction(label_count):
+        llama, tokenizer = ModelFactory.__create_llama_model_quantized()
+        cnn = ModelFactory.__create_convolutional_net()
+        return ModelFactory.__create_partial_prediction_model(llama, cnn, label_count), tokenizer
 
     """
     -- generic models factory functions --

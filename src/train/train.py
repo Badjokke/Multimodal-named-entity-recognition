@@ -252,7 +252,7 @@ def transformer_training(model: Union[torch.nn.Module, PeftModel], train_data, v
     return model, training_results, best_state_dict
 
 
-def perform_epoch(model, tokenizer, train_data, optimizer, labels_mapping, w, scheduler=None, text_only=False, loss_criterion=None):
+def  perform_epoch(model, tokenizer, train_data, optimizer, labels_mapping, w, scheduler=None, text_only=False, loss_criterion=None):
     model.train()
     running_loss = 0.0
     y_pred = []
@@ -271,8 +271,7 @@ def perform_epoch(model, tokenizer, train_data, optimizer, labels_mapping, w, sc
             outputs = model(images, text)
         else:
             outputs = model(text)
-        aligned_labels = aligned_labels[0:, 1:-1]
-        outputs = outputs[0:, 1:-1]
+        outputs, aligned_labels = TrainingUtil.filter_ignored_indexes(outputs, aligned_labels)
         mask = torch.ones_like(aligned_labels, device=device).bool()
 
         loss = model.crf_pass(outputs, aligned_labels, mask, w) if loss_criterion is None else loss_criterion(outputs.permute(0,2,1), aligned_labels)
@@ -316,10 +315,7 @@ def validate_after_epoch(model, tokenizer, validation_data, labels_mapping, w, t
                 outputs = model(images, text)
             else:
                 outputs = model(text)
-
-            aligned_labels = aligned_labels[0:, 1:-1]
-
-            outputs = outputs[0:, 1:-1]
+            outputs, aligned_labels = TrainingUtil.filter_ignored_indexes(outputs, aligned_labels)
             mask = torch.ones_like(aligned_labels, device=device).bool()
             loss = model.crf_pass(outputs, aligned_labels, mask, w) if loss_criterion is None else loss_criterion(outputs.permute(0, 2, 1), aligned_labels)
 

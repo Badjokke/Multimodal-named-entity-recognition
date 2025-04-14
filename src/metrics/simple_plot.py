@@ -27,6 +27,7 @@ class SimplePlot:
         plt.ylim(ymin=0)
         plt.xlim(xmin=0)
         plt.xticks(self.x[0])
+        plt.yticks([i for i in range(0, 105, 5)])
         plt.legend(loc="best")
 
     @staticmethod
@@ -41,6 +42,13 @@ class SimplePlot:
     def __plot_data(self):
         for i in range(len(self.x)):
             plt.plot(self.x[i], self.y[i], label=self.__get_line_label(i), color=self.__get_line_color(i))
+        self.__add_text_value_to_last_points()
+
+    def __add_text_value_to_last_points(self):
+        for i in range(len(self.x)):
+            last_x = self.x[i][-1]
+            last_y = self.y[i][-1]
+            plt.text(last_x, last_y, f"{last_y:.2f}", verticalalignment='bottom', horizontalalignment='right')
 
     def __get_line_label(self, index: int) -> str:
         return f"line_{index + 1}" if index >= len(self.labels) else self.labels[index]

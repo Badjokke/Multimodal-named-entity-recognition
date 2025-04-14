@@ -9,9 +9,11 @@ class TransformerCRF(torch.nn.Module):
         self.out_layer = torch.nn.Linear(text_model.config.hidden_size, num_labels)
         self.reduction_layer = torch.nn.Sequential(
             torch.nn.Linear(text_model.config.hidden_size, text_model.config.hidden_size // 2),
+            torch.nn.LayerNorm(text_model.config.hidden_size // 2),
             torch.nn.Dropout(0.3),
-            torch.nn.ReLU(),
+            torch.nn.GELU(),
         )
+
         self.bilstm = torch.nn.LSTM(
             text_model.config.hidden_size//2,
             text_model.config.hidden_size // 2,

@@ -80,8 +80,8 @@ class JsonlDatasetLoader(AbstractDatasetLoader):
         return wrapper if not train_test_split else JsonlDatasetLoader.custom_train_test_val_split(wrapper['dataset'])
     @staticmethod
     def custom_train_test_val_split(dataset):
-        train, test = train_test_split(dataset, test_size=0.3, random_state=42, shuffle=True)
-        train, val = train_test_split(train, test_size=0.1, random_state=42, shuffle=True)
+        train, test = train_test_split(dataset, test_size=0.3, random_state=142, shuffle=True)
+        train, val = train_test_split(train, test_size=0.1, random_state=142, shuffle=True)
         return {"train":train, "val":val, "test":test}
     @staticmethod
     def __prepare_twitter_dataset_for_training_text(text_set: dict[str, dict[str]]) -> tuple[
