@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from sklearn.utils.class_weight import compute_class_weight
 from train.util.MaximazingEarlyStop import MaximizingEarlyStop
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -57,23 +58,38 @@ class TrainingUtil:
     @staticmethod
     def most_common(lst):
         return max(set(lst), key=lst.count)
+
     @staticmethod
-    def filter_ignored_indexes(x,y):
+    def remove_cls_tokens_bert(x, y):
+        """
+        bert tokenizer uses <pad> tokens <pad>
+        """
+        return x[0:, 1:-1], y[0:,1:-1]
+
+    @staticmethod
+    def remove_cls_tokens_llama(x, y):
+        """
+        llama tokenizer uses <pad> tokens (at least for 3.1)
+        """
+        return x[0:, 1:], y[0:, 1:]
+    @staticmethod
+    def filter_ignored_indexes(x, y):
         assert len(x) == len(y), "x y length diff"
         x = x.tolist()
         y = y.tolist()
         x_new, y_new = [], []
         for batch in range(len(y)):
-            tmp_x,tmp_y = [], []
+            tmp_x, tmp_y = [], []
             for i in range(len(y[batch])):
                 if y[batch][i] == -100:
                     continue
                 tmp_x.append(x[batch][i])
                 tmp_y.append(y[batch][i])
-            x_new.append(torch.tensor(tmp_x, device=device, dtype=torch.float32,requires_grad=True))
+            x_new.append(torch.tensor(tmp_x, device=device, dtype=torch.float32, requires_grad=True))
             # int 64 (i.e. long) is necessary for cross_entropy loss otherwise runtime exception is raised
             y_new.append(torch.tensor(tmp_y, device=device, dtype=torch.int64))
         return torch.stack(x_new), torch.stack(y_new)
+
     @staticmethod
     def decode_labels_majority_vote(word_ids, y_pred):
         y_predicted = y_pred

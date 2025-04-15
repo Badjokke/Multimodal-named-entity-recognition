@@ -2,7 +2,7 @@ from typing import Union
 
 import torch
 from peft import PeftModel
-
+from transformers.models.bert.tokenization_bert_fast import BertTokenizerFast
 from metrics.metrics import Metrics
 from train.optimizer.OptimizerFactory import OptimizerFactory
 from train.util.EarlyStop import StepState
@@ -231,10 +231,11 @@ def transformer_training(model: Union[torch.nn.Module, PeftModel], train_data, v
     max_early_stop = TrainingUtil.create_maximizing_early_stop(patience=patience)
     best_state_dict = None
     training_results = []
+    loss_criterion = TrainingUtil.create_cross_entropy_loss_criterion(class_occurrences) if cross_loss else None
     for epoch in range(epochs):
-        training_loss = perform_epoch(model, tokenizer, train_data, optimizer, {value: key for key, value in labels.items()}, w, text_only=text_only, loss_criterion=TrainingUtil.create_cross_entropy_loss_criterion(class_occurrences) if cross_loss else None)
-        val_loss = validate_after_epoch(model, tokenizer,  validation_data, {value: key for key, value in labels.items()}, w, text_only=text_only,loss_criterion=TrainingUtil.create_cross_entropy_loss_criterion(class_occurrences) if cross_loss else None)
-        test_results = validate_after_epoch(model, tokenizer, test_data, {value: key for key, value in labels.items()}, w, text_only=text_only,loss_criterion=TrainingUtil.create_cross_entropy_loss_criterion(class_occurrences) if cross_loss else None)
+        training_loss = perform_epoch(model, tokenizer, train_data, optimizer, {value: key for key, value in labels.items()}, w, text_only=text_only, loss_criterion=loss_criterion)
+        val_loss = validate_after_epoch(model, tokenizer,  validation_data, {value: key for key, value in labels.items()}, w, text_only=text_only,loss_criterion=loss_criterion)
+        test_results = validate_after_epoch(model, tokenizer, test_data, {value: key for key, value in labels.items()}, w, text_only=text_only,loss_criterion=loss_criterion)
         scheduler.step(val_loss[1]['macro'])
         print("---")
         print(f"[epoch: {epoch + 1}] Training loss: {training_loss[0]}. Training macro f1: {training_loss[1]['macro']}; micro f1: {training_loss[1]['micro']}, acc: {training_loss[1]['accuracy']}")
@@ -252,11 +253,12 @@ def transformer_training(model: Union[torch.nn.Module, PeftModel], train_data, v
     return model, training_results, best_state_dict
 
 
-def  perform_epoch(model, tokenizer, train_data, optimizer, labels_mapping, w, scheduler=None, text_only=False, loss_criterion=None):
+def perform_epoch(model, tokenizer, train_data, optimizer, labels_mapping, w, scheduler=None, text_only=False, loss_criterion=None):
     model.train()
     running_loss = 0.0
     y_pred = []
     y_true = []
+    stripping_function = TrainingUtil.remove_cls_tokens_bert if type(tokenizer) == BertTokenizerFast else TrainingUtil.remove_cls_tokens_llama
     for i in range(len(train_data)):
         data_sample = train_data[i]
         text = tokenizer(data_sample[0], return_tensors="pt", is_split_into_words=True).to(device) if tokenizer is not None else data_sample[0]
@@ -271,7 +273,7 @@ def  perform_epoch(model, tokenizer, train_data, optimizer, labels_mapping, w, s
             outputs = model(images, text)
         else:
             outputs = model(text)
-        outputs, aligned_labels = TrainingUtil.filter_ignored_indexes(outputs, aligned_labels)
+        outputs, aligned_labels = stripping_function(outputs, aligned_labels)
         mask = torch.ones_like(aligned_labels, device=device).bool()
 
         loss = model.crf_pass(outputs, aligned_labels, mask, w) if loss_criterion is None else loss_criterion(outputs.permute(0,2,1), aligned_labels)
@@ -298,6 +300,7 @@ def validate_after_epoch(model, tokenizer, validation_data, labels_mapping, w, t
     model.eval()
     running_loss = 0.
     y_true, y_pred = [], []
+    stripping_function = TrainingUtil.remove_cls_tokens_bert if type(tokenizer) == BertTokenizerFast else TrainingUtil.remove_cls_tokens_llama
     with torch.no_grad():
         for i in range(len(validation_data)):
             data_sample = validation_data[i]
@@ -315,7 +318,7 @@ def validate_after_epoch(model, tokenizer, validation_data, labels_mapping, w, t
                 outputs = model(images, text)
             else:
                 outputs = model(text)
-            outputs, aligned_labels = TrainingUtil.filter_ignored_indexes(outputs, aligned_labels)
+            outputs, aligned_labels = stripping_function(outputs, aligned_labels)
             mask = torch.ones_like(aligned_labels, device=device).bool()
             loss = model.crf_pass(outputs, aligned_labels, mask, w) if loss_criterion is None else loss_criterion(outputs.permute(0, 2, 1), aligned_labels)
 
