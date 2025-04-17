@@ -22,9 +22,9 @@ class PartialPredictionMultimodalModel(torch.nn.Module):
             torch.nn.Linear(self.text_model.config.hidden_size // 2, num_labels)
         )
 
-    def forward(self, visual_feats, text_feats):
+    def forward(self, visual_feats, text_feats, unpack=True):
         visual_out = self.visual_model(visual_feats)
-        text_out = self.text_model(**text_feats).last_hidden_state  # (sentence_len, hidden_size)
+        text_out = self.text_model(**text_feats).last_hidden_state if unpack else self.text_model(text_feats)
 
         visual_out = self.projection_layer(visual_out)
         text_out = self.text_projection_layer(text_out)
@@ -32,4 +32,4 @@ class PartialPredictionMultimodalModel(torch.nn.Module):
         text_out = text_out.repeat(visual_feats.size(0), 1, 1)
         visual_out = visual_out.unsqueeze(1).expand(-1, text_out.size(1), -1)
 
-        return self.out_layer(torch.cat([F.softmax(visual_out, dim=-1), F.softmax(text_out, dim=-1)], dim=1))
+        return self.out_layer(torch.cat([F.softmax(visual_out, dim=-1), F.softmax(text_out, dim=-1)], dim=-1))

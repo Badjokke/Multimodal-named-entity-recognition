@@ -3,16 +3,17 @@ from concurrent.futures import Future
 from typing import Callable, Union
 
 import torch
-from sklearn.model_selection import train_test_split
 from async_io import filesystem
 from data.abstract_dataset_loader import AbstractDatasetLoader
 from data.data_processor import DataProcessor
 from data.data_processors import image_to_tensor, parse_twitter_text
+from sklearn.model_selection import train_test_split
 
 
 class JsonlDatasetLoader(AbstractDatasetLoader):
     def __init__(self, input_path: str = "../dataset/preprocessed/twitter_2017",
-                 lightweight = False,include_parent_dir=False,custom_split=False, text_processors: list[DataProcessor] = None, image_processors: list[DataProcessor] = None):
+                 lightweight=False, include_parent_dir=False, custom_split=False,
+                 text_processors: list[DataProcessor] = None, image_processors: list[DataProcessor] = None):
         """
         class is responsible for loading twitter 2017 in it's raw form - jsonl files and jpges
         and process it to
@@ -35,20 +36,23 @@ class JsonlDatasetLoader(AbstractDatasetLoader):
         text_path = f"{self.input_path}/text_preprocessed"
         text_que = asyncio.Queue(2 ** 8)
         result = await asyncio.gather(filesystem.load_directory_contents(text_path, text_que),
-                                      self.__load_twitter_text(parse_twitter_text, text_que, train_test_split=self.custom_split))
+                                      self.__load_twitter_text(parse_twitter_text, text_que,
+                                                               train_test_split=self.custom_split))
         return result[1]
 
     async def __load_twitter_dataset_image(self):
         image_path = f"{self.input_path}/image_preprocessed"
         image_que = asyncio.Queue(2 ** 8)
-        result = await asyncio.gather(filesystem.load_directory_contents(image_path, image_que, include_parent_dir=self.include_parent_dir),
-                                      self.__transform_images(image_to_tensor, image_que, self.lightweight))
+        result = await asyncio.gather(
+            filesystem.load_directory_contents(image_path, image_que, include_parent_dir=self.include_parent_dir),
+            self.__transform_images(image_to_tensor, image_que, self.lightweight))
         return result[1]
 
     @staticmethod
-    async def __transform_images(transform_function: Callable[[bytes], Future[torch.tensor]], queue: asyncio.Queue, lightweight=False) -> \
-    dict[
-        str, torch.tensor]:
+    async def __transform_images(transform_function: Callable[[bytes], Future[torch.tensor]], queue: asyncio.Queue,
+                                 lightweight=False) -> \
+            dict[
+                str, torch.tensor]:
         dic = {}
         while True:
             item = await queue.get()
@@ -78,11 +82,13 @@ class JsonlDatasetLoader(AbstractDatasetLoader):
             queue.task_done()
             wrapper[item[0].split("_")[-1].split(".")[0]] = result
         return wrapper if not train_test_split else JsonlDatasetLoader.custom_train_test_val_split(wrapper['dataset'])
+
     @staticmethod
     def custom_train_test_val_split(dataset):
         train, test = train_test_split(dataset, test_size=0.2, random_state=142, shuffle=True)
-        train, val = train_test_split(train, test_size=0.1, random_state=142, shuffle=True)
-        return {"train":train, "val":val, "test":test}
+        train, val = train_test_split(dataset, test_size=0.1, random_state=142, shuffle=True)
+        return {"train": train, "val": val, "test": test}
+
     @staticmethod
     def __prepare_twitter_dataset_for_training_text(text_set: dict[str, dict[str]]) -> tuple[
         dict[str, list], dict[str, int]]:
@@ -130,14 +136,17 @@ class JsonlDatasetLoader(AbstractDatasetLoader):
         result = []
         for json in jsonl:
             image_refs = json['image'] if "image" in json else json["images"]
-            images = self.__process_image_refs(image_set, json['image'] if "image" in json else json["images"])
+            images = self.__process_image_refs(image_set, image_refs)
+            # image is missing from dataset, skip
             if images is None:
-                print(f"missing images: {image_refs}. Skipping")
                 continue
             text = self.__apply_data_processor(json['text'], self.text_processors)
             collected_labels = self.__process_labels(json['label'], labels)
             collected_labels = [label for i, label in enumerate(collected_labels) if text[i] is not None]
             text = list(filter(lambda x: x is not None, text))
+            # text is corrupt or filtered out if data_processors are not none; skip
+            if len(text) == 0:
+                continue
             assert len(collected_labels) == len(text), "post filtering of labels and text failed - len diff"
             result.append((text, images, collected_labels))
         return result
@@ -159,7 +168,8 @@ class JsonlDatasetLoader(AbstractDatasetLoader):
         if len(image_refs) == 0:
             return None
         return torch.stack(list(
-            map(lambda ref: image_set[ref], image_refs)) if self.image_processors is None else self.__map_with_data_processor(
+            map(lambda ref: image_set[ref],
+                image_refs)) if self.image_processors is None else self.__map_with_data_processor(
             image_refs, self.image_processors))
 
     @staticmethod

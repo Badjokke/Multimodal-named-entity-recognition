@@ -1,10 +1,12 @@
 import matplotlib.pyplot as plt
 
-
+"""
+uses global object NOT THREAD SAFE
+"""
 class SimplePlot:
     def __init__(self, x: list[list[float]], y: list[list[float]], x_axis_label: str = None, y_axis_label: str = None,
                  plot_title: str = None,
-                 labels: list[str] = [], colors: list[str] = [], fig_size: (int, int) = ()):
+                 labels: list[str] = [], colors: list[str] = [], fig_size: (int, int) = None):
         self.x = x
         self.y = y
         self.x_axis_label = x_axis_label
@@ -17,6 +19,7 @@ class SimplePlot:
 
     def plot(self) -> None:
         assert len(self.x) == len(self.y), f"x and y must have same length. Received {len(self.x)}, {len(self.y)}"
+        plt.figure(figsize=self.__get_fig_size(), clear=True)
         plt.xlabel(self.__get_x_axis_label())
         plt.ylabel(self.__get_y_axis_label())
         plt.title(self.__get_plot_title())
@@ -24,6 +27,7 @@ class SimplePlot:
         plt.ylim(ymin=0)
         plt.xlim(xmin=0)
         plt.xticks(self.x[0])
+        plt.yticks([i for i in range(0, 105, 5)])
         plt.legend(loc="best")
 
     @staticmethod
@@ -33,10 +37,18 @@ class SimplePlot:
     @staticmethod
     def save(path: str) -> None:
         plt.savefig(path, bbox_inches='tight')
+        plt.close()
 
     def __plot_data(self):
         for i in range(len(self.x)):
             plt.plot(self.x[i], self.y[i], label=self.__get_line_label(i), color=self.__get_line_color(i))
+        self.__add_text_value_to_last_points()
+
+    def __add_text_value_to_last_points(self):
+        for i in range(len(self.x)):
+            last_x = self.x[i][-1]
+            last_y = self.y[i][-1]
+            plt.text(last_x, last_y, f"{last_y:.2f}", verticalalignment='bottom', horizontalalignment='right')
 
     def __get_line_label(self, index: int) -> str:
         return f"line_{index + 1}" if index >= len(self.labels) else self.labels[index]
@@ -53,6 +65,9 @@ class SimplePlot:
 
     def __get_y_axis_label(self) -> str:
         return "y-axis" if self.y_axis_label is None else self.y_axis_label
-
+    """
+    creates 500 by 400 figure (in pixels)
+    configured in inches
+    """
     def __get_fig_size(self) -> tuple[int, int]:
-        return (800, 800) if self.fig_size is not None else self.fig_size
+        return (5, 4) if self.fig_size is None else self.fig_size
