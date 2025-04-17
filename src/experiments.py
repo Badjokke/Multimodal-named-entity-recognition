@@ -6,7 +6,7 @@ from huggingface_hub import login
 from torch import save
 
 from data.dataset_analyzer import DatasetAnalyzer
-from data.text_data_processor.stemming_json_data_processor import StemmingTextDataProcessor
+from data.text_data_processor.StemmingJsonDataProcessor import StemmingJsonDataProcessor
 from data.twitter_loaders.twitter2017_dataset_loader import JsonlDatasetLoader
 from data.twitter_preprocessors.twitter2015_preprocessor import Twitter2015Preprocessor
 from data.twitter_preprocessors.twitter2017_preprocessor import Twitter2017Preprocessor
@@ -20,7 +20,7 @@ from util.directories_util import DirectoryUtil
 # llama is much more sensitive to overfitting due to parameter count
 # multimodal models sometimes perform suspiciously poorly
 # lower learning rates than bert and bilstm for critical components
-llama_learning_rates = {"text_module": 1e-6}
+llama_learning_rates = {"text_module": 1e-7, "crf":1e-5, "visual_module": 1e-6, "fusion_layer": 1e-5, "bilstm":1e-6}
 
 
 async def preprocess_twitter17():
@@ -120,7 +120,7 @@ async def unimodal_text_pipeline_t15(model_save_directory: str):
     save(state_dict, model_save_directory + "/llama/t15/text/state_dict/llama_crf_peft.pth")
     print()
     print("Training lstm text only")
-    t17_loader = JsonlDatasetLoader(text_processors=[StemmingTextDataProcessor()])
+    t17_loader = JsonlDatasetLoader(text_processors=[StemmingJsonDataProcessor()])
     data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
     lstm = ModelFactory.create_lstm_text_only_classifier(len(labels.keys()), vocabulary)
     combined, results, state_dict = train.lstm_training(lstm, data['train'],
@@ -144,7 +144,7 @@ async def multimodal_pipeline_t15(model_save_directory: str):
     llama_multimodal_t17(model_save_directory, data, labels, class_occurrences, "t15")
     llama_multimodal_t17(model_save_directory, data, labels, class_occurrences, "t15", cnn=True)
 
-    t17_loader = JsonlDatasetLoader(text_processors=[StemmingTextDataProcessor()],
+    t17_loader = JsonlDatasetLoader(text_processors=[StemmingJsonDataProcessor()],
                                     input_path="../dataset/preprocessed/twitter_2015")
     data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
     lstm_multimodal_t17(model_save_directory, data, labels, class_occurrences, vocabulary, "t15")
@@ -204,7 +204,7 @@ async def unimodal_text_pipeline_soa(model_save_directory: str):
     print()
     print("Training lstm text only")
     soa_loader = JsonlDatasetLoader(input_path="../dataset/preprocessed/SOA", include_parent_dir=True,
-                                    custom_split=True, text_processors=[StemmingTextDataProcessor()])
+                                    custom_split=True, text_processors=[StemmingJsonDataProcessor()])
     data, labels, class_occurrences, vocabulary = await soa_loader.load_dataset()
     lstm = ModelFactory.create_lstm_text_only_classifier(len(labels.keys()), vocabulary)
     combined, results, state_dict = train.lstm_training(lstm, data['train'],
@@ -229,7 +229,7 @@ async def multimodal_pipeline_soa(model_save_directory: str):
     llama_multimodal_t17(model_save_directory, data, labels, class_occurrences, "soa")
     llama_multimodal_t17(model_save_directory, data, labels, class_occurrences, "soa", cnn=True)
 
-    t17_loader = JsonlDatasetLoader(text_processors=[StemmingTextDataProcessor()],
+    t17_loader = JsonlDatasetLoader(text_processors=[StemmingJsonDataProcessor()],
                                     input_path="../dataset/preprocessed/SOA", include_parent_dir=True,
                                     custom_split=True)
     data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
@@ -283,7 +283,7 @@ async def unimodal_text_pipeline_t17(model_save_directory: str):
     save(state_dict, model_save_directory + "/llama/t17/text/state_dict/llama_crf_peft.pth")
     print()
     print("Training lstm text only")
-    t17_loader = JsonlDatasetLoader(text_processors=[StemmingTextDataProcessor()])
+    t17_loader = JsonlDatasetLoader(text_processors=[StemmingJsonDataProcessor()])
     data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
     lstm = ModelFactory.create_lstm_text_only_classifier(len(labels.keys()), vocabulary)
     combined, results, state_dict = train.lstm_training(lstm, data['train'],
@@ -307,7 +307,7 @@ async def multimodal_pipeline_t17(model_save_directory: str):
     llama_multimodal_t17(model_save_directory, data, labels, class_occurrences, "t17")
     llama_multimodal_t17(model_save_directory, data, labels, class_occurrences, "t17", cnn=True)
 
-    t17_loader = JsonlDatasetLoader(text_processors=[StemmingTextDataProcessor()])
+    t17_loader = JsonlDatasetLoader(text_processors=[StemmingJsonDataProcessor()])
     data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
 
     lstm_multimodal_t17(model_save_directory, data, labels, class_occurrences, vocabulary, "t17")

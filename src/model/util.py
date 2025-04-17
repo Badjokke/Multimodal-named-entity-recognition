@@ -47,9 +47,9 @@ def plot_model_training(results: list[dict[str,tuple]], path: str, plot_title: s
     y_test = []
     for i in range(len(results)):
         x.append(i)
-        y_train.append(results[i]["train"][1]["macro"])
-        y_val.append(results[i]["val"][1]["macro"])
-        y_test.append(results[i]["test"][1]["macro"])
+        y_train.append((results[i]["train"][1]["macro"]) * 100)
+        y_val.append((results[i]["val"][1]["macro"]) * 100)
+        y_test.append((results[i]["test"][1]["macro"]) * 100)
     plot = PlotBuilder.build_simple_plot([x] * 3, [y_train, y_val, y_test], **{"plot_title":plot_title, "x_axis_label": "epochs", "y_axis_label": "macro f1", "labels":["train f1 macro", "validation f1 macro", "test f1 macro"]})
     plot.plot()
     print(f"Saving plot to {path}")
