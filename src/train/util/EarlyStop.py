@@ -9,6 +9,7 @@ class EarlyStop(ABC):
         self.last_val = None
         self.patience = patience
         self.counter = 0
+        self.significant_diff = 2
 
     @abstractmethod
     def verify(self, value) -> StepState:

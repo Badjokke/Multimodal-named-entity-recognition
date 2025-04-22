@@ -223,7 +223,7 @@ def validate_after_epoch_lstm(model, validation_data, labels_mapping, w, text_on
 -- transformer based with tokenizer
 """
 def transformer_training(model: Union[torch.nn.Module, PeftModel], train_data, validation_data, test_data, tokenizer,
-                         class_occurrences, labels, epochs=10, patience=3, text_only=False,cross_loss=False, learning_rates={}):
+                         class_occurrences, labels, epochs=10, patience=3, text_only=False, cross_loss=False, learning_rates={}, val_on_test=False):
     model.to(device)
     optimizer = OptimizerFactory.create_adamw_optimizer(model, learning_rates=learning_rates)
     scheduler = OptimizerFactory.create_plateau_scheduler(optimizer)
@@ -243,8 +243,8 @@ def transformer_training(model: Union[torch.nn.Module, PeftModel], train_data, v
         print(f"[epoch: {epoch + 1}] Test loss: {test_results[0]}. Test macro f1: {test_results[1]['macro']}; micro f1: {test_results[1]['micro']}, acc: {test_results[1]['accuracy']}")
         print("---")
         training_results.append({"train":training_loss, "val": val_loss, "test":test_results})
-
-        state = max_early_stop.verify(val_loss[1]['macro'])
+        #the only reason to use val_on_test = True for early stopping is if validation set is super small which is the case for SOA
+        state = max_early_stop.verify(val_loss[1]['macro']) if not val_on_test else max_early_stop.verify(test_results[1]['macro'])
         if state == StepState.STOP:
             print("Early stopping")
             break
