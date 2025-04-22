@@ -187,7 +187,7 @@ async def unimodal_text_pipeline_soa(model_save_directory: str):
     bert_crf, tokenizer = ModelFactory.create_bert_text_only_classifier(len(labels.keys()))
     combined, results, state_dict = train.transformer_training(bert_crf, data['train'], data["val"], data["test"],
                                                                tokenizer, class_occurrences, labels, epochs=15,
-                                                               patience=3, text_only=True, val_on_test=True)
+                                                               patience=3, text_only=True)
     plot_model_training(results, f"{model_save_directory}/bert/soa/text/fig/plot.png", "Bert+CRF classifier SOA")
     save(state_dict, model_save_directory + "/bert/soa/text/state_dict/bert_crf.pth")
     print()
@@ -197,7 +197,8 @@ async def unimodal_text_pipeline_soa(model_save_directory: str):
     combined, results, state_dict = train.transformer_training(llama, data['train'],
                                                                data["val"], data["test"], tokenizer, class_occurrences,
                                                                labels, epochs=15, patience=3, text_only=True,
-                                                               learning_rates=llama_learning_rates, val_on_test=True)
+                                                               learning_rates=llama_learning_rates
+                                                               )
     plot_model_training(results, f"{model_save_directory}/llama/soa/text/fig/plot.png", "Llama+CRF classifier SOA")
     save(state_dict, model_save_directory + "/llama/soa/text/state_dict/llama_crf_peft.pth")
     print()
@@ -209,7 +210,7 @@ async def unimodal_text_pipeline_soa(model_save_directory: str):
     combined, results, state_dict = train.lstm_training(lstm, data['train'],
                                                         data["val"], data["test"],
                                                         class_occurrences, labels, patience=5, text_only=True,
-                                                        epochs=50, val_on_test=True)
+                                                        epochs=50)
     plot_model_training(results, f"{model_save_directory}/lstm/t15/text/fig/plot.png",
                         "LSTM CRF text only T15")
     save(state_dict, model_save_directory + "/lstm/t15/text/state_dict/lstm_crf.pth")
@@ -222,18 +223,18 @@ async def multimodal_pipeline_soa(model_save_directory: str):
                                     custom_split=True)
     data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
 
-    bert_multimodal_t17(model_save_directory, data, labels, class_occurrences, "soa", val_on_test=True)
-    bert_multimodal_t17(model_save_directory, data, labels, class_occurrences, "soa", cnn=True, val_on_test=True)
+    bert_multimodal_t17(model_save_directory, data, labels, class_occurrences, "soa")
+    bert_multimodal_t17(model_save_directory, data, labels, class_occurrences, "soa", cnn=True)
 
-    llama_multimodal_t17(model_save_directory, data, labels, class_occurrences, "soa", val_on_test=True)
-    llama_multimodal_t17(model_save_directory, data, labels, class_occurrences, "soa", cnn=True, val_on_test=True)
+    llama_multimodal_t17(model_save_directory, data, labels, class_occurrences, "soa")
+    llama_multimodal_t17(model_save_directory, data, labels, class_occurrences, "soa", cnn=True)
 
     t17_loader = JsonlDatasetLoader(text_processors=[StemmingJsonDataProcessor()],
                                     input_path="../dataset/preprocessed/SOA", include_parent_dir=True,
                                     custom_split=True)
     data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
-    lstm_multimodal_t17(model_save_directory, data, labels, class_occurrences, vocabulary, "soa", val_on_test=True)
-    lstm_multimodal_t17(model_save_directory, data, labels, class_occurrences, vocabulary, "soa", cnn=True, val_on_test=True)
+    lstm_multimodal_t17(model_save_directory, data, labels, class_occurrences, vocabulary, "soa")
+    lstm_multimodal_t17(model_save_directory, data, labels, class_occurrences, vocabulary, "soa", cnn=True)
 
     print("==SOA multimodal pipeline over==\n")
 
@@ -315,7 +316,7 @@ async def multimodal_pipeline_t17(model_save_directory: str):
     print("==T17 multimodal pipeline over==\n")
 
 
-def bert_multimodal_t17(model_save_directory, data, labels, class_occurrences, dataset, cnn=False, val_on_test=True):
+def bert_multimodal_t17(model_save_directory, data, labels, class_occurrences, dataset, cnn=False):
     label_count = len(labels.keys())
     visual_model_label = "VIT" if not cnn else "CNN"
 
@@ -323,7 +324,7 @@ def bert_multimodal_t17(model_save_directory, data, labels, class_occurrences, d
     bert_vit, tokenizer = ModelFactory.create_bert_vit_attention_classifier(label_count) if not cnn else ModelFactory.create_bert_cnn_attention_classifier(label_count)
     combined, results, state_dict = train.transformer_training(bert_vit, data['train'], data["val"], data["test"],
                                                                tokenizer,
-                                                               class_occurrences, labels, epochs=15, patience=3, val_on_test=val_on_test)
+                                                               class_occurrences, labels, epochs=15, patience=3)
     plot_model_training(results, f"{model_save_directory}/bert/{dataset}/multimodal/fig/cross_plot.png",
                         f"Cross Attention Bert+{visual_model_label}+CRF classifier {dataset.upper()}")
     save(state_dict, f"{model_save_directory}/bert/{dataset}/multimodal/state_dict/bert_{visual_model_label.lower()}_cross_attention.pth")
@@ -332,7 +333,7 @@ def bert_multimodal_t17(model_save_directory, data, labels, class_occurrences, d
     bert_vit, tokenizer = ModelFactory.create_bert_vit_linear_fusion(label_count) if not cnn else ModelFactory.create_bert_cnn_linear_fusion(label_count)
     combined, results, state_dict = train.transformer_training(bert_vit, data['train'], data["val"], data["test"],
                                                                tokenizer,
-                                                               class_occurrences, labels, epochs=15, patience=3, val_on_test=val_on_test)
+                                                               class_occurrences, labels, epochs=15, patience=3)
     plot_model_training(results, f"{model_save_directory}/bert/{dataset}/multimodal/fig/linear_plot.png",
                         f"Linear fusion Bert+{visual_model_label}+CRF classifier {dataset.upper()}")
     save(state_dict, f"{model_save_directory}/bert/{dataset}/multimodal/state_dict/bert_{visual_model_label.lower()}_linear_fusion.pth")
@@ -341,13 +342,13 @@ def bert_multimodal_t17(model_save_directory, data, labels, class_occurrences, d
     combined, results, state_dict = train.transformer_training(bert_vit, data['train'], data["val"], data["test"],
                                                                tokenizer,
                                                                class_occurrences, labels, epochs=15, patience=3,
-                                                               cross_loss=True, val_on_test=val_on_test)
+                                                               cross_loss=True)
     plot_model_training(results, f"{model_save_directory}/bert/{dataset}/multimodal/fig/partial_plot.png",
                         f"Partial Prediction BERT+{visual_model_label} classifier {dataset.upper()}")
     save(state_dict, f"{model_save_directory}/bert/{dataset}/multimodal/state_dict/bert_{visual_model_label.lower()}_partial_prediction.pth")
 
 
-def llama_multimodal_t17(model_save_directory, data, labels, class_occurrences, dataset, cnn = False, val_on_test=False):
+def llama_multimodal_t17(model_save_directory, data, labels, class_occurrences, dataset, cnn = False):
     label_count = len(labels.keys())
     visual_model_label = "VIT" if not cnn else "CNN"
     print(f"==LLAMA_{visual_model_label}_CROSS_ATTENTION==")
@@ -355,7 +356,7 @@ def llama_multimodal_t17(model_save_directory, data, labels, class_occurrences, 
     combined, results, state_dict = train.transformer_training(llama_vit, data['train'], data["val"], data["test"],
                                                                tokenizer,
                                                                class_occurrences, labels, epochs=15, patience=3,
-                                                               learning_rates=llama_learning_rates, val_on_test=val_on_test)
+                                                               learning_rates=llama_learning_rates)
     plot_model_training(results, f"{model_save_directory}/llama/{dataset}/multimodal/fig/cross_plot.png",
                         f"Cross Attention Llama+{visual_model_label}+CRF classifier {dataset.upper()}")
     save(state_dict, f"{model_save_directory}/llama/{dataset}/multimodal/state_dict/llama_{visual_model_label.lower()}_cross_attention_peft.pth")
@@ -364,7 +365,7 @@ def llama_multimodal_t17(model_save_directory, data, labels, class_occurrences, 
     combined, results, state_dict = train.transformer_training(llama_vit, data['train'], data["val"], data["test"],
                                                                tokenizer,
                                                                class_occurrences, labels, epochs=15, patience=3,
-                                                               learning_rates=llama_learning_rates, val_on_test=val_on_test)
+                                                               learning_rates=llama_learning_rates)
     plot_model_training(results, f"{model_save_directory}/llama/{dataset}/multimodal/fig/linear_plot.png",
                         f"Linear fusion Llama+{visual_model_label}+CRF classifier {dataset.upper()}")
     save(state_dict, f"{model_save_directory}/llama/{dataset}/multimodal/state_dict/llama_{visual_model_label.lower()}_linear_fusion_peft.pth")
@@ -373,21 +374,21 @@ def llama_multimodal_t17(model_save_directory, data, labels, class_occurrences, 
     combined, results, state_dict = train.transformer_training(llama_vit, data['train'], data["val"], data["test"],
                                                                tokenizer,
                                                                class_occurrences, labels, epochs=15, patience=3,
-                                                               cross_loss=True, learning_rates=llama_learning_rates, val_on_test=val_on_test)
+                                                               cross_loss=True, learning_rates=llama_learning_rates)
     plot_model_training(results, f"{model_save_directory}/llama/{dataset}/multimodal/fig/partial_plot.png",
                         f"Llama+{visual_model_label} Partial prediction classifier {dataset.upper()}")
     save(state_dict,
          f"{model_save_directory}/llama/{dataset}/multimodal/state_dict/llama_{visual_model_label.lower()}_partial_prediction_peft.pth")
 
 
-def lstm_multimodal_t17(model_save_directory, data, labels, class_occurrences, vocabulary, dataset, cnn = False, val_on_test=False):
+def lstm_multimodal_t17(model_save_directory, data, labels, class_occurrences, vocabulary, dataset, cnn = False):
     label_count = len(labels.keys())
     visual_model_label = "VIT" if not cnn else "CNN"
     print(f"==LSTM_{visual_model_label}_CROSS_ATTENTION==")
     lstm = ModelFactory.create_lstm_vit_attention_classifier(label_count, vocabulary) if not cnn else ModelFactory.create_lstm_cnn_attention_classifier(label_count, vocabulary)
     combined, results, state_dict = train.lstm_training(lstm, data['train'],
                                                         data["val"], data["test"],
-                                                        class_occurrences, labels, patience=5, val_on_test=val_on_test)
+                                                        class_occurrences, labels, patience=5)
     plot_model_training(results, f"{model_save_directory}/lstm/{dataset}/multimodal/fig/cross_plot.png",
                         f"Cross Attention BILSTM+{visual_model_label}+CRF classifier {dataset.upper()}")
     save(state_dict, f"{model_save_directory}/lstm/{dataset}/multimodal/state_dict/lstm_{visual_model_label.lower()}_cross_attention.pth")
@@ -395,7 +396,7 @@ def lstm_multimodal_t17(model_save_directory, data, labels, class_occurrences, v
     lstm = ModelFactory.create_lstm_vit_linear_fusion(label_count, vocabulary) if not cnn else ModelFactory.create_lstm_cnn_linear_fusion(label_count, vocabulary)
     combined, results, state_dict = train.lstm_training(lstm, data['train'],
                                                         data["val"], data["test"],
-                                                        class_occurrences, labels, patience=5, val_on_test=val_on_test)
+                                                        class_occurrences, labels, patience=5)
     plot_model_training(results, f"{model_save_directory}/lstm/{dataset}/multimodal/fig/linear_plot.png",
                         f"Linear fusion BILSTM+{visual_model_label}+CRF classifier {dataset.upper()}")
     save(state_dict, f"{model_save_directory}/lstm/{dataset}/multimodal/state_dict/lstm_{visual_model_label.lower()}_linear.pth")
@@ -403,7 +404,7 @@ def lstm_multimodal_t17(model_save_directory, data, labels, class_occurrences, v
     lstm = ModelFactory.create_lstm_vit_partial_prediction(label_count, vocabulary) if not cnn else ModelFactory.create_lstm_cnn_partial_prediction(label_count, vocabulary)
     combined, results, state_dict = train.lstm_training(lstm, data['train'],
                                                         data["val"], data["test"],
-                                                        class_occurrences, labels, patience=5, cross_loss=True, val_on_test=val_on_test)
+                                                        class_occurrences, labels, patience=5, cross_loss=True)
     plot_model_training(results, f"{model_save_directory}/lstm/{dataset}/multimodal/fig/partial_plot.png",
                         f"BILSTM+{visual_model_label} Partial prediction classifier {dataset.upper()}")
     save(state_dict, f"{model_save_directory}/lstm/{dataset}/multimodal/state_dict/lstm_{visual_model_label.lower()}_partial.pth")
