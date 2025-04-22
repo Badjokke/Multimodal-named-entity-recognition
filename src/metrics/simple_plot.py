@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 """
 uses global object NOT THREAD SAFE
 """
+
+
 class SimplePlot:
     def __init__(self, x: list[list[float]], y: list[list[float]], x_axis_label: str = None, y_axis_label: str = None,
                  plot_title: str = None,
@@ -28,17 +30,20 @@ class SimplePlot:
         plt.ylabel(self.__get_y_axis_label())
         plt.title(self.__get_plot_title())
         self.__plot_data()
+        self.__draw_best_macro_f1_text()
         plt.ylim(ymin=0)
         plt.xlim(xmin=0)
         plt.xticks(self.x[0])
         plt.yticks([i for i in range(0, 105, 5)])
         plt.legend(loc="lower right", labels=self.__get_legend_labels_with_macro_f1_information())
         return self
+
     def __get_legend_labels_with_macro_f1_information(self):
         legend_labels = []
         for i in range(len(self.y)):
-            legend_labels.append(f"{self.labels[i]} macro-f1: {self.y[i][-1]:.2f}")
+            legend_labels.append(f"{self.labels[i]}, f1: {max(self.y[i]):.2f}%")
         return legend_labels
+
     @staticmethod
     def show():
         plt.show()
@@ -51,14 +56,28 @@ class SimplePlot:
     def __plot_data(self):
         for i in range(len(self.x)):
             plt.plot(self.x[i], self.y[i], label=self.__get_line_label(i), color=self.__get_line_color(i))
-        #self.__add_text_value_to_last_points()
+
+    def __draw_best_macro_f1_text(self):
+        """
+        terrible, avoid unless fire
+        """
+        last_x = self.x[0][-1]
+        text = ""
+        n = len(self.y)
+        for i in range(n):
+            text += f"{self.labels[i]} macro f1 score  {max(self.y[i])}"
+            if i < n - 1:
+                text += "\n"
+        bbox = dict(boxstyle='round', fc='blanchedalmond', ec='orange', alpha=0.5)
+        plt.text(3.5, 4, text, fontsize=9, bbox=bbox, horizontalalignment='right')
 
     def __add_text_value_to_last_points(self):
         for i in range(len(self.x)):
             last_x = self.x[i][-1]
             last_y = self.y[i][-1]
             last_y_position = self.__get_y_label_relaxed_position(last_y)
-            plt.text(last_x, last_y_position, f"{self.labels[i]}: {last_y:.2f}", verticalalignment='bottom', horizontalalignment='right')
+            plt.text(last_x, last_y_position, f"{self.labels[i]}: {last_y:.2f}", verticalalignment='bottom',
+                     horizontalalignment='right')
             self.__append_y_position_of_label(last_y_position)
 
     def __get_line_label(self, index: int) -> str:
@@ -76,11 +95,12 @@ class SimplePlot:
 
     def __get_y_axis_label(self) -> str:
         return "y-axis" if self.y_axis_label is None else self.y_axis_label
-    """
-    creates 500 by 400 figure (in pixels)
-    configured in inches
-    """
+
     def __get_fig_size(self) -> tuple[int, int]:
+        """
+        creates 500 by 400 figure (in pixels)
+        configured in inches
+        """
         return (5, 4) if self.fig_size is None else self.fig_size
 
     def __append_y_position_of_label(self, y):
@@ -94,13 +114,15 @@ class SimplePlot:
 
     def __shift_label_down_on_y_axis(self, y):
         return y - self.__y_shift_down
+
     def __shift_label_up_on_y_axis(self, y):
         return y + self.__y_shift_up
 
+
 if __name__ == "__main__":
-    epochs = [i for i in range(1,8)]
+    epochs = [i for i in range(1, 8)]
     y_1 = [65, 68, 74, 75, 74, 78, 79]
     y_2 = [60, 63, 69, 70, 69, 73, 78]
     y_3 = [60, 63, 69, 70, 69, 73, 77]
-    p = SimplePlot([epochs]*3, [y_1, y_2, y_3], x_axis_label="Epochs", y_axis_label="Value")
+    p = SimplePlot([epochs] * 3, [y_1, y_2, y_3], x_axis_label="Epochs", y_axis_label="Value")
     p.plot().show()
