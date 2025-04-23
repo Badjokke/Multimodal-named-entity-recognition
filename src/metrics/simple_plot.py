@@ -40,7 +40,7 @@ class SimplePlot:
     def __get_legend_labels_with_macro_f1_information(self):
         legend_labels = []
         for i in range(len(self.y)):
-            legend_labels.append(f"{self.labels[i]}, f1: {max(self.y[i]):.2f}%")
+            legend_labels.append(f"{self.labels[i]}: {max(self.y[i]):.2f}%")
         return legend_labels
 
     @staticmethod
