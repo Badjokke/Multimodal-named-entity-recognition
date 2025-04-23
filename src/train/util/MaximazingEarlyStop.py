@@ -12,11 +12,3 @@ class MaximizingEarlyStop(EarlyStop):
         self.last_val = value
         self.counter = 0
         return StepState.BETTER
-
-if __name__ == '__main__':
-    stop = MaximizingEarlyStop(3)
-    vals = [1, 2, 3 ,4 ,5 ,6 ,7 , 8, 6, 6 ,6, 9]
-    for val in vals:
-        print(val)
-        if stop.verify(val) == StepState.STOP:
-            break
