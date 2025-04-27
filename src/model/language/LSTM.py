@@ -23,6 +23,9 @@ class LSTM(nn.Module):
 
     def forward(self, text_features):
         text_features = self.tokenizer(text_features)
+        #add batch dimension if input is not batched
+        if len(text_features.size()) == 1:
+            text_features = text_features.unsqueeze(0)
         x = self.embedding(text_features)
         x, (hidden, cell) = self.lstm(x)
         return self.dropout(self.layer_norm(x))

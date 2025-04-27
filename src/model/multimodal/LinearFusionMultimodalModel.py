@@ -37,9 +37,9 @@ class LinearFusionMultimodalModel(torch.nn.Module):
             )
         self.crf = CRF(num_labels, batch_first=True)
 
-    def forward(self, visual_feats, text_feats):
+    def forward(self, visual_feats, text_feats, unpack=True):
         visual_out = self.visual_model(visual_feats)
-        text_out = self.text_model(**text_feats).last_hidden_state  # (sentence_len, hidden_size)
+        text_out = self.text_model(**text_feats).last_hidden_state if unpack else self.text_model(text_feats)
 
         visual_out = self.projection_layer(visual_out)
         text_out = self.text_projection_layer(text_out)
