@@ -20,7 +20,7 @@ from util.directories_util import DirectoryUtil
 # llama is much more sensitive to overfitting due to parameter count
 # multimodal models sometimes perform suspiciously poorly
 # lower learning rates than bert and bilstm for critical components
-llama_learning_rates = {"text_module": 1e-7, "crf":1e-5, "visual_module": 1e-6, "fusion_layer": 1e-5, "bilstm":1e-6}
+llama_learning_rates = {"text_module": 2e-5, "crf":2e-5, "visual_module": 2e-5, "fusion_layer": 2e-5, "bilstm":2e-5}
 
 
 async def preprocess_twitter17():

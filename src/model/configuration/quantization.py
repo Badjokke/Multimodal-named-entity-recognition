@@ -15,12 +15,11 @@ def create_default_quantization_config() -> BitsAndBytesConfig:
 
 def _create_lora_config() -> LoraConfig:
     config = LoraConfig(
-        r=4,
-        lora_alpha=16,
-        target_modules=["q_proj", "v_proj", "k_proj", "o_proj", "down_proj", "up_proj"],
-        lora_dropout=0.05,
+        r=2,
+        lora_alpha=32,
+        lora_dropout=0.1,
         bias="none",
-        task_type="TOKEN_CLS"
+        task_type=TaskType.FEATURE_EXTRACTION
     )
     return config
 
