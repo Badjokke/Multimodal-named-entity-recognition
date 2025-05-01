@@ -8,6 +8,7 @@ from data.abstract_dataset_preprocessor import AbstractDatasetPreprocessor
 from data.label_data_processor.label_mapping_processor import LabelMappingProcessor
 from data.util.file_format_parser import FileFormatParser
 from data.visual_data_processor.resizing_data_processor import ResizingDataProcessor
+from util.directories_util import DirectoryUtil
 
 
 class Twitter2015Preprocessor(AbstractDatasetPreprocessor):
@@ -17,6 +18,7 @@ class Twitter2015Preprocessor(AbstractDatasetPreprocessor):
         self.image_processor = ResizingDataProcessor()
         #maps to t17 classes
         self.label_processor = LabelMappingProcessor({"I-OTHER": "I-MIS", "B-OTHER": "B-MIS"})
+        DirectoryUtil.create_preprocessed_dataset_directories(self.output_path)
 
     async def load_and_transform_dataset(self):
         text_task = asyncio.create_task(self.__load_twitter15_text_dataset(filesystem.save_file))

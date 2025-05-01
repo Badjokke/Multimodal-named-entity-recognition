@@ -2,9 +2,10 @@ import asyncio
 from typing import Callable, Coroutine
 
 from async_io import filesystem
+from data.abstract_dataset_preprocessor import AbstractDatasetPreprocessor
 from data.text_data_processor.json_data_processor import TwitterJsonDataProcessor
 from data.visual_data_processor.resizing_data_processor import ResizingDataProcessor
-from data.abstract_dataset_preprocessor import AbstractDatasetPreprocessor
+from util.directories_util import DirectoryUtil
 
 
 class Twitter2017Preprocessor(AbstractDatasetPreprocessor):
@@ -13,6 +14,7 @@ class Twitter2017Preprocessor(AbstractDatasetPreprocessor):
         self.output_path = output_path
         self.text_processor = TwitterJsonDataProcessor()
         self.image_processor = ResizingDataProcessor()
+        DirectoryUtil.create_preprocessed_dataset_directories(self.output_path)
 
     async def load_and_transform_dataset(self):
         text_task = asyncio.create_task(self.__load_twitter_text_dataset(filesystem.save_file))

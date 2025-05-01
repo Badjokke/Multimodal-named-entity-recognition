@@ -9,6 +9,8 @@ class FileFormatParser:
         tweets = file.split("\n\n")
         result = []
         for tweet in tweets:
+            if tweet.strip() == "":
+                continue
             items = tweet.split("\n")
             img_id = FileFormatParser.__get_img_id(items[0])
             words, labels = FileFormatParser.__get_words_and_labels(items[1:])

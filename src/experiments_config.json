@@ -1,0 +1,28 @@
+{
+  "experiments": [
+    {
+      "pipeline": [
+        "text",
+        "image",
+        "multimodal"
+      ],
+      "datasets": {
+        "SOA": {
+          "input_path": "../dataset/preprocessed/SOA"
+        },
+        "T15": {
+          "input_path": "../dataset/preprocessed/twitter_2015"
+        },
+        "T17": {
+          "input_path": "../dataset/preprocessed/twitter_2017"
+        }
+      },
+      "models": [
+        "BERT",
+        "LLAMA",
+        "LSTM"
+      ],
+      "results_path": "../experiment_pepa"
+    }
+  ]
+}
