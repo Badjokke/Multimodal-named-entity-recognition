@@ -34,7 +34,7 @@ def _parse_twitter_text(content: bytes) -> list[dict[str, str]]:
     lines = content.decode('utf-8').split('\n')
     tmp = []
     for line in lines:
-        if line == '\n':
+        if line == '\n' or line == "":
             continue
         jsonl = json.loads(line)
         tmp.append(jsonl)
