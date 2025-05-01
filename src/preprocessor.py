@@ -13,9 +13,9 @@ def parse_args():
                         help='Path to the T15 directory (optional)')
 
     parser.add_argument('--t17_out', type=str, default=None,
-                        help='Path to the T15 output directory (optional)')
-    parser.add_argument('--t17_out', type=str, default=None,
                         help='Path to the T17 output directory (optional)')
+    parser.add_argument('--t15_out', type=str, default=None,
+                        help='Path to the T15 output directory (optional)')
     return parser.parse_args()
 
 async def preprocess_twitter17(twitter17_path, dataset_out):
