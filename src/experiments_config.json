@@ -2,9 +2,9 @@
   "experiments": [
     {
       "pipeline": [
-        "text",
-        "image",
-        "multimodal"
+        "TEXT",
+        "IMAGE",
+        "MULTIMODAL"
       ],
       "datasets": {
         "SOA": {
@@ -20,9 +20,46 @@
       "models": [
         "BERT",
         "LLAMA",
-        "LSTM"
+        "LSTM",
+        "VIT",
+        "CNN"
       ],
       "results_path": "../experiment_pepa"
+    },
+     {
+      "pipeline": [
+        "MULTIMODAL"
+      ],
+      "datasets": {
+        "SOA": {
+          "input_path": "../dataset/preprocessed/SOA"
+        },
+        "T17": {
+          "input_path": "../dataset/preprocessed/twitter_2017"
+        }
+      },
+      "models": [
+        "BERT"
+      ],
+      "results_path": "../experiment_lada"
+    },
+    {
+      "pipeline": [
+        "IMAGE"
+      ],
+      "datasets": {
+        "SOA": {
+          "input_path": "../dataset/preprocessed/SOA"
+        },
+        "T17": {
+          "input_path": "../dataset/preprocessed/twitter_2017"
+        }
+      },
+      "models": [
+        "VIT",
+        "CNN"
+      ],
+      "results_path": "../experiment_standa"
     }
   ]
 }

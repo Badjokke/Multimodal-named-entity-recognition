@@ -156,7 +156,7 @@ async def unimodal_text_pipeline_soa(model_save_directory: str, exp: Experiment)
         plot_model_training(results, f"{model_save_directory}/lstm/t15/text/fig/plot.png",
                             "LSTM CRF text only T15")
         save(state_dict, model_save_directory + "/lstm/t15/text/state_dict/lstm_crf.pth")
-        print("==T15 text pipeline over---\n")
+        print("==SOA text pipeline over---\n")
 
 
 async def multimodal_pipeline_soa(model_save_directory: str, exp: Experiment):

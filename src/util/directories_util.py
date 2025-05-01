@@ -1,6 +1,5 @@
 import os
 
-from numpy.core.defchararray import upper
 
 
 class DirectoryUtil:
@@ -31,20 +30,20 @@ class DirectoryUtil:
         self.__create_dataset_directories("soa", base_model_paths)
 
     def __create_dataset_directories(self, dataset_dir: str, base_model_paths: list[str]):
-        if upper(dataset_dir) not in self.data_sets:
+        if dataset_dir.upper() not in self.data_sets:
             return
         for base_path in base_model_paths:
             prefix = f"{base_path}/{dataset_dir}"
             multimodal_prefix = f"{prefix}/multimodal"
             text_prefix = f"{prefix}/text"
             image_prefix = f"{prefix}/image"
-            if "multimodal" in self.pipeline:
+            if "MULTIMODAL" in self.pipeline:
                 DirectoryUtil.__mkdirs_no_err(f"{multimodal_prefix}/fig")
                 DirectoryUtil.__mkdirs_no_err(f"{multimodal_prefix}/state_dict")
-            if "text" in self.pipeline:
+            if "TEXT" in self.pipeline:
                 DirectoryUtil.__mkdirs_no_err(f"{text_prefix}/fig")
                 DirectoryUtil.__mkdirs_no_err(f"{text_prefix}/state_dict")
-            if "image" in self.pipeline:
+            if "IMAGE" in self.pipeline:
                 DirectoryUtil.__mkdirs_no_err(f"{image_prefix}/fig")
                 DirectoryUtil.__mkdirs_no_err(f"{image_prefix}/state_dict")
 
