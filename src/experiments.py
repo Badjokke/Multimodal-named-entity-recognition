@@ -383,24 +383,18 @@ def login_user():
 
 
 def load_experiments(config_file_path: str) -> list[Experiment]:
-    parser = ConfigParser(config_file_path)
-    for idx, exp in enumerate(parser.get_experiments(), 1):
-        print(f"Experiment {idx}:")
-        print("Datasets:", exp.get_datasets())
-        print("Models:", exp.get_models())
-    return parser.get_experiments()
-
+    return ConfigParser(config_file_path).get_experiments()
 
 def create_experiment_directories(exp: Experiment):
     base_path = exp.results_path
     util = DirectoryUtil(base_path, set(exp.get_datasets().keys()), set(exp.get_models()), set(exp.get_pipeline()))
     util.create_directories_for_result_logs()
 
-
 if __name__ == "__main__":
     experiments = load_experiments("experiments_config.json")
     login_user()
-    for experiment in experiments:
+    for idx, experiment in enumerate(experiments):
+        print(f"==Experiment {idx} START==")
         base_path = experiment.get_results_path()
         create_experiment_directories(experiment)
         if experiment.contains_dataset("soa"):
@@ -415,3 +409,4 @@ if __name__ == "__main__":
             asyncio.run(unimodal_image_pipeline_t17(base_path, experiment))
             asyncio.run(unimodal_text_pipeline_t17(base_path, experiment))
             asyncio.run(multimodal_pipeline_t17(base_path, experiment))
+        print(f"==Experiment {idx} END==")
