@@ -1,6 +1,5 @@
 llama
 target
-dataset
 venv
 finetuned
 src/*/__pycache__
