@@ -10,8 +10,8 @@ echo "Downloading $twitter17 dataset from GDrive"
 curl -L "https://drive.usercontent.google.com/download?id=1-HIsdNKtncinP2GKaa4YF0pe3NnG4K_t&confirm=xxx" -o "$twitter17"
 
 echo "Unpacking"
-unzip "$twitter15" -d twitter_2015
-unzip "$twitter17" -d twitter_2017
+unzip "$twitter15"
+unzip "$twitter17"
 
 rm "$twitter15"
 rm "$twitter17"
