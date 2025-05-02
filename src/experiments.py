@@ -19,6 +19,8 @@ llama_learning_rates = {"text_module": 2e-5, "crf": 2e-5, "visual_module": 2e-5,
 
 """==T15 EXPERIMENTS=="""
 async def unimodal_image_pipeline_t15(model_save_directory: str, exp: Experiment):
+    if not exp.contains_pipeline("image"):
+        return
     print("==Running T15 image pipeline==")
     t15_loader = JsonlDatasetLoader(input_path=exp.get_datasets()["T15"])
     data, labels, class_occurrences, vocabulary = await t15_loader.load_dataset()
@@ -40,6 +42,8 @@ async def unimodal_image_pipeline_t15(model_save_directory: str, exp: Experiment
 
 
 async def unimodal_text_pipeline_t15(model_save_directory: str, exp: Experiment):
+    if not exp.contains_pipeline("text"):
+        return
     print("==Running T15 text pipeline==")
     t15_loader = JsonlDatasetLoader(input_path=exp.get_datasets()["T15"])
     data, labels, class_occurrences, vocabulary = await t15_loader.load_dataset()
@@ -77,6 +81,8 @@ async def unimodal_text_pipeline_t15(model_save_directory: str, exp: Experiment)
 
 
 async def multimodal_pipeline_t15(model_save_directory: str, exp: Experiment):
+    if not exp.contains_pipeline("multimodal"):
+        return
     print("==T15 multimodal pipeline start==")
     t17_loader = JsonlDatasetLoader(input_path=exp.get_datasets()["T15"])
     data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
@@ -96,6 +102,8 @@ async def multimodal_pipeline_t15(model_save_directory: str, exp: Experiment):
 
 """==SOA EXPERIMENTS=="""
 async def unimodal_image_pipeline_soa(model_save_directory: str, exp: Experiment):
+    if not exp.contains_pipeline("image"):
+        return
     print("==Running SOA image pipeline==")
     soa_loader = JsonlDatasetLoader(input_path=exp.get_datasets()["SOA"], include_parent_dir=True,
                                     custom_split=True)
@@ -120,6 +128,8 @@ async def unimodal_image_pipeline_soa(model_save_directory: str, exp: Experiment
 
 
 async def unimodal_text_pipeline_soa(model_save_directory: str, exp: Experiment):
+    if not exp.contains_pipeline("multimodal"):
+        return
     print("==Running SOA text pipeline==")
     soa_loader = JsonlDatasetLoader(input_path=exp.get_datasets()["SOA"], include_parent_dir=True,
                                     custom_split=True)
@@ -160,6 +170,8 @@ async def unimodal_text_pipeline_soa(model_save_directory: str, exp: Experiment)
 
 
 async def multimodal_pipeline_soa(model_save_directory: str, exp: Experiment):
+    if not exp.contains_pipeline("multimodal"):
+        return
     print("==SOA multimodal pipeline start==")
     t17_loader = JsonlDatasetLoader(input_path=exp.get_datasets()["SOA"], include_parent_dir=True,
                                     custom_split=True)
@@ -183,6 +195,8 @@ async def multimodal_pipeline_soa(model_save_directory: str, exp: Experiment):
 
 """==T17 EXPERIMENTS=="""
 async def unimodal_image_pipeline_t17(model_save_directory: str, exp: Experiment):
+    if not exp.contains_pipeline("image"):
+        return
     print("==Running T17 image pipeline==")
     t17_loader = JsonlDatasetLoader(input_path=exp.get_datasets()["T17"])
     data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
@@ -207,6 +221,8 @@ async def unimodal_image_pipeline_t17(model_save_directory: str, exp: Experiment
 
 
 async def unimodal_text_pipeline_t17(model_save_directory: str, exp: Experiment):
+    if not exp.contains_pipeline("text"):
+        return
     print("==Running T17 text pipeline==")
     t17_loader = JsonlDatasetLoader(input_path=exp.get_datasets()["T17"])
     data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
@@ -244,6 +260,8 @@ async def unimodal_text_pipeline_t17(model_save_directory: str, exp: Experiment)
 
 
 async def multimodal_pipeline_t17(model_save_directory: str, exp: Experiment):
+    if not exp.contains_pipeline("multimodal"):
+        return
     print("==T17 multimodal pipeline start==")
     t17_loader = JsonlDatasetLoader(input_path=exp.get_datasets()["T17"])
     data, labels, class_occurrences, vocabulary = await t17_loader.load_dataset()
