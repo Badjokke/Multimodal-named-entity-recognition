@@ -128,7 +128,7 @@ async def unimodal_image_pipeline_soa(model_save_directory: str, exp: Experiment
 
 
 async def unimodal_text_pipeline_soa(model_save_directory: str, exp: Experiment):
-    if not exp.contains_pipeline("multimodal"):
+    if not exp.contains_pipeline("text"):
         return
     print("==Running SOA text pipeline==")
     soa_loader = JsonlDatasetLoader(input_path=exp.get_datasets()["SOA"], include_parent_dir=True,
