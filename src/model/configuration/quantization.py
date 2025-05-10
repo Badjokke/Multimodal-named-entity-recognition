@@ -16,7 +16,7 @@ def create_default_quantization_config() -> BitsAndBytesConfig:
 def _create_lora_config() -> LoraConfig:
     config = LoraConfig(
         r=2,
-        lora_alpha=32,
+        lora_alpha=16,
         lora_dropout=0.1,
         bias="none",
         task_type=TaskType.FEATURE_EXTRACTION
