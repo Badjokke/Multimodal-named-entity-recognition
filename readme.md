@@ -6,16 +6,16 @@ We have created a custom historical dataset from Czech-Bavarian books which we a
 We have used Twitter17 and Twitter2015 datasets which are publicly available and can be used to perform a robust evaluation.  
 
 # Proposed models
-Architecture of proposed models is depicted below. The images are hideous, I will resize them eventually (right).
+Architecture of proposed models is depicted below.
 ## Linear fusion model
 This model is fairly simple and standard - it concatenates the features from text and vision module and makes a prediction from them
-![alt text](architecture/linear_fusion_bert_twitter.png)
+![alt text](architecture/linear_fusion_bert_twitter_small.png)
 ## Cross attention fusion model
 I wanted to explore the possible cross-attention fusion with modalities. It is possible and the model performs well for all three datasets. 
-![alt text](architecture/cross_attention_bert_twitter.png)
+![alt text](architecture/cross_attention_bert_twitter_small.png)
 ## Partial prediction
 My personal favourite altought it might be a bit dumb. The idea is to make a prediction from the text and the image features alone and then fuse them together to make a final prediction. This model works surprisingly well.
-![alt text](architecture/partial_prediction.png)
+![alt text](architecture/partial_prediction_small.png)
 
 # Results 
 The best results for T17 and T15 datasets. I have used token-wise macro F1 which is a very strict metric for this task.
