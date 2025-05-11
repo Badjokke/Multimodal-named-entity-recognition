@@ -33,3 +33,4 @@ The devils lies in the dataset preprocessing. A more complex preprocessing (I ha
 This does not seem to help the model very much. A viable way is to pretrain the model on some custom dataset which could help with the heavy class imbalance.  
 Another interesting path could be to filter out entire tweets with low class variabily.  
 I have looked at other solutions from various researchers much smarter than me but it seems like they are tailoring their model architecture to perform well specifically on T17 dataset as they achive better results that us but we beat them on T15. 
+Llama 3.1 does not perform very well, its consistently around 65~70 macro F1. We have also used GPT-4o-mini which has multimodal capabilities and it achieved token wise macro F1 score of 54.31% which is not great. 
